@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+source "local/urldecode"
+declare -A get
+for i in $(tr "&" " " <<< "$1"); do
+	read -r key val <<< "$(tr "=" " " <<< "$i")"
+	key="$(urldecode "$key")"
+	val="$(urldecode "$val")"
+	get[$key]="$val"
+done
+echo "Good morning, ${get[name]}! Here are your headers:"
+shift
+for i in "$@"; do
+	echo -n "> $i"
+done
