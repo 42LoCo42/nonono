@@ -1,0 +1,13 @@
+* nonono
+#+begin_src text
+  projects aplenty
+  in multitudinous langs
+  nonono contains
+#+end_src
+
+Miscellaneous accretions from the bottom of my =dev= folder;
+a historic archive representing my programming journey.
+You're invited to browse its many entries, though beware:
+their quality is dubious at best, and many lie in eternal hiatus.
+
+Please don't disturb the librarians~ 🕷️🕸️
