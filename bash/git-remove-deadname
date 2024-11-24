@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+git filter-branch --commit-filter '
+if [ "$GIT_AUTHOR_NAME" = "Leon Schumacher" ];
+then
+        GIT_AUTHOR_NAME="Eleonora";
+        GIT_COMMITTER_NAME="Eleonora";
+        git commit-tree "$@";
+else
+        git commit-tree "$@";
+fi' HEAD

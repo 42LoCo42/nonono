@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+declare -a barchars=(▏ ▎ ▍ ▌ ▋ ▊ ▉ █)
+
+# value (0-1 or 0-100%) width (or empty for max width)
+bar() {
+	local value width tmp full rest
+
+	# convert value if given as %
+	case "$1" in
+		[0-9]*%)
+			value="$(echo "2k ${1%\%} 100 / p" | dc)"
+		;;
+		*)
+			value="$1"
+		;;
+	esac
+
+	# get width
+	if [ -z "$2" ]; then
+		# (:;:) is a micro sleep to give shopt some time
+		shopt -s checkwinsize; (:;:)
+		width="$COLUMNS"
+	else
+		width="$2"
+	fi
+
+	# how many full chars to draw
+	tmp="$(echo "8 $width $value * * p" | dc | awk '{print int($1+0.5)}')"
+	read -r rest full <<< "$(echo "$tmp 8 ~ f" | dc | tr '\n' ' ')"
+
+	# print full blocks
+	eval "printf \"${barchars[7]}%.0s\" $(seq -s ' ' 1 "$full")"
+
+	# print partial block
+	((rest > 0)) && ((rest=rest-1)) && printf "%s" "${barchars[rest]}"
+}
+
+current=0
+barinc() {
+	if ((current == 8)); then
+		current=0
+	else
+		printf '\b'
+	fi
+	# shellcheck disable=SC2059
+	printf "${barchars[current]}"
+	((current=current+1))
+}
+
+main() {
+	tput civis
+
+	echo "Bars: 10 30 full"
+	for ((i = 0; i <= 100; i++)) {
+		printf '\r'
+		bar "$i%" "10"
+		printf '\u1b[B\r'
+		bar "$i%" "30"
+		printf '\u1b[B\r'
+		bar "$i%"
+		printf '\u1b[2A'
+	}
+	echo
+	echo
+	echo
+
+	echo "barinc 80 times"
+	for ((i = 1; i <= 80; i++)) {
+		barinc
+		sleep 0.015
+	}
+	echo
+
+	tput cnorm
+}
+
+main

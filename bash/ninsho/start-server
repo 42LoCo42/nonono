@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+exec nc \
+	--ssl --ssl-cert "cert" --ssl-key  "key" \
+	-lnkp 37812 \
+	-e ./server

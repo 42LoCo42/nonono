@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+export LANG=C
+
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+(($# < 1)) && cat << EOF >&2 && exit 1
+Usage: $0 [OPTIONS]... PACKAGE
+
+OPTIONS:
+	-a <architecture>    Override architecture
+	-m <path>            Override mirrorlist
+	-r <repository>      Override repository
+	-v <version>         Override version
+	-c                   Skip signature verification
+	-s                   Keep signature file
+EOF
+
+while getopts :a:m:r:v:cs arg; do
+	case "$arg" in
+		a) arch="$OPTARG" ;;
+		m) mirrorlist="$OPTARG" ;;
+		r) repo="$OPTARG" ;;
+		v) version="$OPTARG" ;;
+		c) skipsig=1 ;;
+		s) keepsig=1 ;;
+		:) die "Missing argument for -$OPTARG" ;;
+		?) die "Invalid option -$OPTARG" ;;
+	esac
+done
+shift "$((OPTIND - 1))"
+
+cleanup() {
+	local status="$?"
+	((status != 0)) && rm -f "$path" "$path.sig"
+	return $status
+}
+trap cleanup EXIT
+
+field() {
+	sed -En "s|^$1.*: (.*)$|\1|p" <<< "$info" | head -n1
+}
+
+# get full package name
+[ -n "$arch" ] && [ -n "$repo" ] && [ -n "$version" ] \
+|| info="$(pacman -Si "$1")" || die "Could not get package information"
+: "${arch:="$(field "Architecture")"}"
+: "${repo:=$(field "Repository")}"
+: "${version:="$(field "Version")"}"
+path="$1-$version-$arch.pkg.tar.zst"
+
+# create list of urls
+: "${mirrorlist:="/etc/pacman.d/mirrorlist"}"
+mapfile -t urls <<< "$(
+	sed -En 's|^Server = (https://.*)$|\1|p' "$mirrorlist" \
+		| sed "s|\$repo|$repo|; s|\$arch|$arch|; s|$|/$path|" \
+)"
+
+# get package
+for u in "${urls[@]}"; do
+	echo -ne "\r\e[KTrying $u"
+	curl -fsLO "$u" && echo && break
+done
+[ -f "$path" ] || die -e "\nCould not download $path"
+
+((skipsig)) || {
+	# get package signature
+	for u in "${urls[@]}"; do
+		echo -ne "\r\e[KTrying $u.sig"
+		curl -fsLO "$u.sig" && echo && break
+	done
+	[ -f "$path.sig" ] || die -e "\nCould not download $path.sig"
+
+	# verify signature
+	pacman-key -v "$path.sig" || die "Package verification failed"
+
+	# delete signature
+	((keepsig)) || rm "$path.sig"
+}
+

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC2155
+declare -r _this_script="$(readlink -f "$0")"
+goto() {
+	[ -z "$1" ] && return
+	cmd="$(sed "0,/^: $1$/d" "$_this_script")"
+	eval "$cmd"
+	exit
+}
+
+source "smooth_bar"
+
+iterations=500
+
+i=0
+: foo
+printf '\r'
+bar "$(echo "scale=3; $i/$iterations" | bc)" 42
+((i = i + 1))
+if ((i <= iterations)); then goto foo; fi
+echo
+
+for ((i = 0; i <= iterations; i++)); do
+	printf '\r'
+	bar "$(echo "scale=3; $i/$iterations" | bc)" 42
+done

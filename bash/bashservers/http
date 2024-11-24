@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+source common
+
+handle_request() {
+	parse_request
+	security_check
+	rewrite_path
+	access_file
+	send_response
+}
+
+in_request=0
+content_length=0
+headers=()
+path=""
+params=""
+content=""
+
+parse_request() {
+	while read -r line; do
+		[ -z "$line" ] && break
+		line="$(bstrip "$line")"
+		real_len="${#line}"
+
+		if ((in_request == 0)); then
+			in_request=1
+			path="$(awk '{print $2}' <<< "$line")"
+			index="$(subindex "?" "$path")"
+			((index > -1)) && {
+				params="${path: $((index + 1))}"
+				path="${path: 0: $index}"
+			}
+		elif [ "${line: 0: 16}" == "Content-Length: " ]; then
+			content_length="${line: 16}"
+		elif ((real_len == 0)); then
+			((content_length > 0)) && content="$(head -c "$content_length")"
+			in_request=0
+		fi
+		headers+=("$line")
+		((in_request == 0)) && break
+	done
+	path="$(./urldecode "$path")"
+	log "${headers[0]} $content"
+}
+
+security_check() {
+	local full_path suffix
+
+	# canonicalize path (note: has no tailing /)
+	full_path="$(readlink -f "$ROOT$path")"
+	# path is webroot, this is ok
+	[ "$full_path" == "$ROOT" ] && path="/" && return
+
+	# if canonicalized path is not root + original path, log LFI
+	suffix="${full_path#$ROOT}"
+	if [ "$suffix" == "${path%/}" ]; then
+		path="$ROOT$path"
+	else
+		log "Attempted LFI!"
+		path="$ROOT/403.sh"
+	fi
+}
+
+rewrite_path() {
+	[ "$path" == "/" ] && path="$ROOT/index.html"
+	[ "${path: -1}" == "/" ] && path="${path%/}"
+	[ ! -x "$path" ] && [ ! -r "$path" ] && path="$ROOT/404.sh"
+	log "Final path: $path"
+}
+
+access_file() {
+	if [ -x "$path" ]; then
+		read -r out err <<< "$(
+			run_resource "$path" "$params" "${headers[@]}" <<< "$content"
+		)"
+		response_num="$(head -c 3 "$err")"
+		response_headers="$(tail -c+5 "$err")"
+		path="$out"
+	else
+		response_num=200
+		response_headers="Content-Type: $(file -bi "$path")"$'\r\n'
+	fi
+}
+
+send_response() {
+	echo -ne "\
+HTTP/1.1 $response_num\r\n\
+Content-Length: $(wc -c < "$path")\r\n\
+$response_headers\r\n"
+cat "$path"
+[ -n "$out" ] && rm "$out" "$err"
+}
+
+handle_request

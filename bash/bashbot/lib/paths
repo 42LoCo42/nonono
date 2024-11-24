@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+root_d="$(dirname "$(readlink -f "$0")")/.."
+
+export token_f="$root_d/token"
+export resume_payload_f="$root_d/resume_payload"
+
+export tmp_d="$root_d/tmp"
+export fsend_f="$tmp_d/fsend"
+export frecv_f="$tmp_d/frecv"
+export lines_f="$tmp_d/lines"
+export log_f="$tmp_d/log"
+export running_f="$tmp_d/running"
+export heartbeat_no_ack_f="$tmp_d/heartbeat_no_ack"

@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+gameVersion="$1"
+modLoaderType="$2"
+shift 2
+modNames=("$@")
+P=20
+key="$(dirname "$(realpath "$0")")/key"
+
+warn() {
+	echo "$@" >&2
+}
+
+req() {
+	warn "> $1"
+	curl -sLS "https://api.curseforge.com$1" -H "Accept: application/json" -H "x-api-key: $(< "$key")"
+}
+
+need() {
+	if [ -n "$1" ]; then
+		echo "$2 = $1"
+	else
+		warn "No $2 found!"
+		return 1
+	fi
+}
+
+all() {
+	res=
+	i=0
+	while true; do
+		this="$(req "$1index=$((i * P))")"
+		res+="$this"
+		((i++))
+		(("$(jq ".pagination.resultCount" <<< "$this")" < P)) && break
+	done
+	echo "$res"
+}
+
+gameId="$(
+	all "/v1/games?" \
+	| jq '.data[] | select(.name | match("^Minecraft$")) | .id'
+)"
+need "$gameId" "Game ID" || exit 1
+
+for modName in "${modNames[@]}"; do
+	modId="$(
+		all "/v1/mods/search?gameId=$gameId&gameVersion=$gameVersion&modLoaderType=$modLoaderType&searchFilter=$modName&" \
+		| jq '.data[] | select(.links.websiteUrl | match("/mc-mods/'"$modName"'$")) | .id' \
+		| head -1
+	)"
+	need "$modId" "Mod ID" || continue
+
+	downloadUrl="$(
+		all "/v1/mods/${modId}/files?" \
+		| jq -r '
+			.data[]
+			| select(.gameVersions[] | . == "'"$modLoaderType"'")
+			| select(.gameVersions[] | . == "'"$gameVersion"'")
+			| "\(.fileDate) \(.downloadUrl)"
+		' | sort -r | head -n1 | cut -d ' ' -f 2-
+	)" # TODO multiple version selector support
+	need "$downloadUrl" "Download URL" || continue
+
+	curl -LS "${downloadUrl// /%20}" -o "${downloadUrl##*/}"
+done

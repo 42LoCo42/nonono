@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+if (($# == 0)); then
+	sudo echo it works
+	sudo nohup "$0" a > /dev/stdout 2>&1 &
+else
+	systemctl stop lightdm
+	echo efi-framebuffer.0 > /sys/bus/platform/drivers/efi-framebuffer/unbind
+	echo 3 > /proc/sys/vm/drop_caches
+	echo 1 > /proc/sys/vm/compact_memory
+	virsh start Windows11
+	while sleep 1; do pgrep qemu-system || break; done
+	echo efi-framebuffer.0 > /sys/bus/platform/drivers/efi-framebuffer/bind
+	systemctl start lightdm
+fi

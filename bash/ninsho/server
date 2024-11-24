@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -eu
+users="users"
+program="./server-program"
+
+trap 'pkill -P $$' EXIT
+
+# read client request
+read -r username client_nonce
+
+# generate & send server nonce
+server_nonce="$(base64 -w 0 "/dev/urandom" | head -c 16)"
+echo "$server_nonce"
+
+# read & verify login string
+read -r login
+{
+	base64 -d <<< "$login"
+	echo "$username" "$client_nonce" "$server_nonce"
+} | est -v "$users/$username" && exec "$program" "$username"

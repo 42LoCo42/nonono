@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+starts=(10 24 38 52)
+
+encode() {
+	row=0
+	col=0
+	while read -rN1 char; do
+		if [ "$char" == $'\n' ]; then
+			((row++))
+			col=-1
+		elif [ "$char" != " " ]; then
+			((row % 2 == 0)) && echo -n 'S'
+
+			((col % 2 == 1)) && echo -n 'M'
+
+			echo "$((starts[row / 2] + col / 2))"
+		fi
+
+		((col++))
+	done | xargs ./lookup | shuf | paste -sd ''
+}
+
+# decode() {
+# 	for i in
+# }
+
+encode

@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+set -e
+source PKGBUILD
+
+AKYURO_EXT="#AKYURO_EXT#"
+
+die() {
+	echo "[38;5;1m$1[m"
+	exit 1
+}
+
+
+declare -f package >/dev/null || die "No package() function found!"
+
+(($# < 1)) && die "No pkgdir given!"
+srcdir="$PWD"
+pkgdir="$(readlink -f "$1")"
+
+akyuro_pkgname="$pkgbase"
+[ -z "$akyuro_pkgname" ] && akyuro_pkgname="$pkgname"
+
+cd "$srcdir"
+
+download_git() {
+	akyuro_dir="${akyuro_dir%.git}"
+	mkdir -p "$akyuro_dir"
+	cd "$akyuro_dir"
+	[ -d ".git" ] || {
+		git init
+		git remote add origin "$akyuro_url"
+		git fetch --depth=1 origin "$akyuro_source" || git fetch
+		git checkout "${akyuro_source:-FETCH_HEAD}"
+	}
+	cd ..
+}
+
+download_sources() {
+	echo "[38;5;4mProcessing sources...[m"
+	local akyuro_source
+	for akyuro_source in "${source[@]}"; do
+		local akyuro_dir="" akyuro_vcs="" akyuro_url=""
+
+		# get name
+		if echo "$akyuro_source" | grep -q '::'; then
+			akyuro_dir="${akyuro_source%%::*}"
+			akyuro_source="${akyuro_source#*::}"
+		fi
+
+		# get vcs
+		if echo "$akyuro_source" | grep -q '+'; then
+			akyuro_vcs="${akyuro_source%%+*}"
+			akyuro_source="${akyuro_source#*+}"
+		fi
+
+		# get url
+		akyuro_url="${akyuro_source%%#*}"
+		[ -z "$akyuro_url" ] && die "No url in source $akyuro_source"
+
+		# get fragment
+		akyuro_source="${akyuro_source#*#}"
+		[ "$akyuro_source" == "$akyuro_url" ] && akyuro_source=""
+		akyuro_source="${akyuro_source#branch=}"
+		akyuro_source="${akyuro_source#commit=}"
+
+		echo "[38;5;2mSource info:"
+		[ -z "$akyuro_dir" ]    || echo "  [38;5;4mname[m $akyuro_dir"
+		[ -z "$akyuro_vcs" ]    || echo "  [38;5;4mvcs[m  $akyuro_vcs"
+		[ -z "$akyuro_url" ]    || echo "  [38;5;4murl[m  $akyuro_url"
+		[ -z "$akyuro_source" ] || echo "  [38;5;4mfrag[m $akyuro_source"
+
+		# generate target name from url if empty
+		[ -z "$akyuro_dir" ] && akyuro_dir="${akyuro_url##*/}"
+
+		# download source
+		case "$akyuro_vcs" in
+			"")
+				case "$akyuro_url" in
+					http://*|https://*)
+						curl -fL "$akyuro_url" -o "$akyuro_dir" -z "$akyuro_dir"
+					;;
+					git://*)
+						download_git
+					;;
+				*)
+					[ ! -f "$akyuro_url" ] && die "Local file $akyuro_url not found!"
+				;;
+				esac
+			;;
+			git)
+				download_git
+			;;
+		esac
+
+		# try to extract source
+		"$AKYURO_EXT" "$akyuro_dir" "." || true
+
+	done
+	echo "[38;5;2mSources are ready![m"
+}
+
+download_sources
+
+declare -f prepare >/dev/null && echo "[38;5;2mRunning [38;5;4mprepare[m" && prepare; cd "$srcdir"
+declare -f pkgver >/dev/null && echo "[38;5;2mRunning [38;5;4mpkgver[m" && pkgver; cd "$srcdir"
+declare -f build >/dev/null && echo "[38;5;2mRunning [38;5;4mbuild[m" && build; cd "$srcdir"
+declare -f check >/dev/null && echo "[38;5;2mRunning [38;5;4mcheck[m" && check; cd "$srcdir"
+echo "[38;5;2mRunning [38;5;4mpackage[m"
+package

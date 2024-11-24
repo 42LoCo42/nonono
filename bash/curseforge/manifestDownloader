@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+geturl() {
+	cdn="https://edge.forgecdn.net/files"
+
+	read -r proj file <<< "$1"
+	split="$(sed -E 's|^(....)|\1/|; s|/0+|/|' <<< "$file")"
+	name="$(
+		./req "/v1/mods/$proj/files/$file" \
+		| jq -r '.data.fileName'
+	)"
+	wget -P "mods" "$cdn/$split/$name"
+}
+export -f geturl
+
+jq -r '.files[] | "\(.projectID) \(.fileID)"' < "$1" \
+| parallel geturl

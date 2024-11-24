@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# vim: set filetype=sh:
+p="$1"
+shift
+cat << EOF
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>bash-http test page</title>
+		<meta charset="utf-8"/>
+	</head>
+	<body>
+		<h1>bash-http test page</h1>
+		The bash-http server is running!
+		<h3>Parameters</h3>
+		<textarea>$(tr "&" "\n" <<< "$p")</textarea>
+		<h3>Headers</h3>
+		<textarea>$(for i in "$@"; do echo "$i"; done)</textarea>
+		<h3>Content</h3>
+		<textarea>$(cat)</textarea>
+		<h3>GET formular</h3>
+		<form>
+			<label for="foo">Type something:</label>
+			<input type="text" name="foo" required/>
+			<input type="submit" value="Send"/>
+		</form>
+		<h3>POST formular</h3>
+		<form method="post">
+			<label for="foo">Type something:</label>
+			<input type="text" name="foo" required/>
+			<input type="submit" value="Send"/>
+		</form>
+	</body>
+</html>
+EOF
+echo "200" >&2

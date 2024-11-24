@@ -1,0 +1,7 @@
+*.auth
+*.log
+/acc*
+/crypt
+/logs
+42loco42.duckdns.org.key
+fullchain.cer

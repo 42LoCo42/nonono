@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -e
+
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+file="$1"
+[ -r "$file" ] || die "$file is not readable!"
+
+installed() {
+	command -v "$1" >/dev/null
+}
+
+notfound_stop() {
+	installed "$1" \
+	|| die "Stopping: $1 is not available, please install it!"
+}
+
+notfound_warn() {
+	installed "$1" \
+	|| echo "Warning: $1 is not available, this reduces functionality!" >&2
+}
+
+notfound_stop "file"
+notfound_stop "7z"
+notfound_warn "gzip"
+notfound_warn "bzip2"
+notfound_warn "xz"
+notfound_warn "zstd"
+notfound_warn "lz4"
+
+remove_ext() {
+	echo "${file%.*}"
+}
+
+cx() {
+	new="$(remove_ext).$1"
+	mv "$file" "$new" 2>/dev/null
+	file="$new"
+}
+
+get_type() {
+	type="$(
+		file -bi "$file" \
+		| cut -d ';' -f 1 \
+		| cut -d '/' -f 2
+	)"
+}
+
+get_contents() {
+	7z l "$file" | awk '
+		BEGIN {
+			display = 0
+		}
+		/^[- ]*$/ {
+			if(length($1) == 19) {
+				display = 1 - display
+			}
+			next
+		}
+		{
+			if(display == 1) {
+				print substr($0, 54)
+			}
+		}
+	' | cut -d '/' -f 1 | sort -u
+}
+
+unpack() {
+	case "$type" in
+		# compressed file
+		gzip)            cx "gz"   ; gzip  -d      "$file" ; : 0 ;;
+		x-compress)      cx "Z"    ; gzip  -d      "$file" ; : 0 ;;
+		x-bzip2)         cx "bz2"  ; bzip2 -d      "$file" ; : 0 ;;
+		x-xz)            cx "xz"   ; xz    -d      "$file" ; : 0 ;;
+		x-lzma)          cx "lzma" ; xz    -d      "$file" ; : 0 ;;
+		x-lz4)           cx "lz4"  ; lz4   -d --rm "$file" ; : 0 ;;
+		zstd)            cx "zst"  ; zstd  -d --rm "$file" ; : 0 ;;
+		# archive file
+		x-tar)           cx "tar"  ; : 1 ;;
+		x-7z-compressed) cx "7z"   ; : 1 ;;
+		x-rar)           cx "rar"  ; : 1 ;;
+		zip)             cx "zip"  ; : 1 ;;
+		# unknown file
+		*)                           : 2 ;;
+	esac
+	case "$_" in
+		0)
+			file="$(remove_ext)"
+			get_type
+			unpacked_once="1"
+			return 0
+			;;
+		1)
+			return 1
+			unpacked_once="1"
+			;;
+		2)
+			if [ -z "$unpacked_once" ]; then
+				die "Unkown file type $type!"
+			else
+				echo "Single output file: $file"
+				exit
+			fi
+		;;
+	esac
+}
+
+# initialize file type
+get_type
+
+# run unpack until it fails (has finished)
+safety=10
+while unpack; do
+	((safety = safety - 1)) || die "Reached decompression limit!"
+done
+
+# run checks on toplevel
+contents="$(get_contents)"
+tl_cnt="$(wc -l <<< "$contents")"
+if [ "$tl_cnt" == "1" ]; then
+	tl_pth="$contents"
+else
+	tl_pth="$(remove_ext)"
+fi
+
+[ -e "$tl_pth" ] && die "Stopping: Directory (or file) $tl_pth exists!"
+
+# extract archive
+if [ "$tl_cnt" == "1" ]; then
+	7z x -o. "$file" >/dev/null
+else
+	mkdir "$tl_pth"
+	7z x -o"$tl_pth" "$file" >/dev/null
+fi
+
+# try removing an empty toplevel (this can fail)
+rmdir "$tl_pth" 2>/dev/null || true
+
+# remove archive
+# rm "$file"
+
+if [ "$(file -bi "$tl_pth" | cut -d ";" -f 1)" == "inode/directory" ]; then
+	echo "Output folder: $tl_pth"
+else
+	echo "Output file: $tl_pth"
+fi

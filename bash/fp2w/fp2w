@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+
+line() {
+	sed "$1q;d"
+}
+
+# get gpg version
+gpg="gpg2"
+command -v "$gpg" >/dev/null || gpg="gpg"
+command -v "$gpg" >/dev/null || {
+	echo "No GPG found!"
+	exit 1
+}
+
+[ $# -lt 1 ] && {
+	echo "Usage: $0 <your@email.xyz> [other emails...]"
+	exit 1
+}
+
+for mail in "$@"; do
+	"$gpg" --list-key --with-fingerprint "$mail" \
+	| line 2 \
+	| sed -E 's|^ +||; s| +|\n|g' \
+	| while read -r hex; do
+		line "$(echo "ibase=16; $hex+3" | bc)" < ./fingerprint_words.txt
+	done \
+	| paste -sd " "
+done

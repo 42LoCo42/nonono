@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+index=0
+while true; do
+	res="$(./req "$1&index=$index")"
+	resultCount="$(jq '.pagination.resultCount' <<< "$res")"
+	[ -z "$resultCount" ] && continue
+	((resultCount == 0)) && break
+	((index += resultCount))
+	echo "$res"
+done

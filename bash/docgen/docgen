@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+in="$1"
+html="${1%md}html"
+pdf="${1%md}pdf"
+
+files="$(dirname "$(realpath "$0")")"
+
+genHTML() {
+	cat << EOF
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8"/>
+		<style>
+		$(< "$files/style.css")
+		</style>
+	</head>
+	<body>
+EOF
+	# custom replacements:
+	# [BREAK] = page break
+	# trailing \ = line break (two spaces in markdown)
+	sed '
+		s|^\[BREAK\]$|<div style="page-break-before: always;"></div>|;
+		s|\\$|  |;
+	' "$in" \
+	| awk -f "$files/numbers.awk" \
+	| markdown_py \
+		-x codehilite \
+		-x fenced_code \
+		-x tables \
+		-x toc
+	cat << EOF
+	</body>
+</html>
+EOF
+}
+
+gen() {
+	genHTML > "$html"
+	wkhtmltopdf --enable-local-file-access "$html" "$pdf"
+}
+
+gen
+(($# == 1)) && {
+	tmux select-pane -L
+	tmux resize-pane -Z
+	tmp="$(mktemp)"
+	coproc _ (zathura "$pdf"; rm "$tmp")
+	while inotifywait -e modify "$1" "$tmp"; do
+		[ ! -f "$tmp" ] && break
+		gen
+	done
+}

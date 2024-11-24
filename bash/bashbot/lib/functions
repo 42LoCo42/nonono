@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
+declare raw_token d author author_id content my_status
+
+# call other_args...
+rest_req() {
+	call="$1"
+	shift
+	curl -sL \
+		-H "Authorization: $raw_token" \
+		-H "Content-Type: application/json" \
+		"https://discord.com/api/v8${call}" "$@" \
+	| tee -a "$lines_f"
+	echo >> "$lines_f"
+}
+
+# status
+set_my_status() {
+	rest_req "/users/@me/settings" \
+		-X PATCH -d "{\"status\": \"$1\"}" >/dev/null
+}
+
+escape() {
+	sed -z 's|\n|\\n|g'
+}
+
+# channel_id msg
+send_msg() {
+	local content
+	content="$(escape <<< "$2")"
+	rest_req "/channels/$1/messages" \
+		-X POST -d "{\"content\": \"$content\"}" >/dev/null
+}
+
+# channel_id msg_id
+del_msg() {
+	rest_req "/channels/$1/messages/$2" -X DELETE >/dev/null
+}
+
+# channel_id
+get_channel_type() {
+	rest_req "/channels/$1" | jq -r ".type"
+}
+
+my_id="$(rest_req "/users/@me" | jq -r ".id")"
+
+handle_message() {
+	local nlws channel_id
+	echo "$author: $content"
+	nlws="${content## }"
+	IFS=$'\n' read -r -d '' channel_id <<< \
+		"$(jq -r ".channel_id" <<< "$d")"
+
+	if [ "$author_id" == "$my_id" ]; then
+		# afk and kafk trigger status change to idle
+		echo "$nlws" | grep -qE "^k?afk " && \
+		set_my_status "idle" && work "*" "Setting status to idle..."
+		echo "$nlws" | grep -qE "^k?afk$" && \
+		set_my_status "idle" && work "*" "Setting status to idle..."
+
+		# bwd triggers status change to online
+		echo "$nlws" | grep -qE "^bwd$" && \
+		set_my_status "online" && work "*" "Setting status to online..."
+
+		[[ "$content" =~ ^! ]] && {
+			cmd="${content#!}"
+			warn "RUNNING CMD $cmd"
+			out="$($cmd 2>&1)"
+			warn "OUTPUT $out"
+			send_msg "$channel_id" "$out"
+		}
+	else
+		# TODO this gets a major rework
+		# # respond when not online and direct message
+		# [ "$my_status" != "online" ] && \
+		# [ "$content" != "k" ] && \
+		# [ "$(get_channel_type "$channel_id")" == "1" ] && {
+		# 	send_msg "$channel_id" "Ich bin gerade nicht da"
+		# }
+		true
+	fi
+
+	# [ "$content" == "!laugh" ] && {
+	# 	mpv "laughtrack.opus" >/dev/null &
+	# }
+}

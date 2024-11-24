@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+jq -n --arg prompt "$*" '{
+	$prompt,
+	"temperature": 0.5
+}' \
+| curl "https://api.openai.com/v1/engines/chatgpt/completions" \
+	-K "token" --json @-

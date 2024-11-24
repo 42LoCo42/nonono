@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC1090
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+source common
+
+me="$(hostname --fqdn)"
+state=-1 # -1 because after server hello both are at 0
+declare -a extensions
+declare -A extension_params
+
+declare user pass sender
+declare -a recipients
+source "$1"
+
+while read -r line; do
+	stripped="$(bstrip "$line")"
+	log "$stripped"
+
+	read -r -d "" -a fields <<< "$(sed -E "s|^([0-9]+)-|\1 |" <<< "$stripped")"
+	rsp="${fields[0]}"
+	grep -Eq "^[0-9]+-" <<< "$stripped" && multi=1 || multi=0
+
+	if ((rsp == 220 && state == -1)); then
+		send "EHLO $me"
+		state=0
+	elif ((rsp == 250 && state == 0)); then
+		extensions+=("${fields[1]}")
+		extension_params[${fields[1]}]="$(cut -d " " -f 3- <<< "${fields[*]}")"
+		((multi == 1)) && continue
+
+		for i in "${extensions[@]}"; do
+			log "Ext: $i ${extension_params[$i]}"
+		done
+
+		if grep -q "PLAIN" <<< "${extension_params[AUTH]}"; then
+			echo "AUTH PLAIN $(base64 <<< "$user:$pass")"
+			log "AUTH PLAIN <private>"
+			state=1
+		else
+			send "MAIL FROM:<$sender>"
+			state=2
+		fi
+	elif ((rsp == 535 && state == 1)); then
+		send "QUIT"
+		exit
+	elif ((rsp == 235 && state == 1)); then
+		send "MAIL FROM:<$sender>"
+		state=2
+	elif ((rsp == 250 && state == 2)); then
+		for i in "${recipients[@]}"; do
+			send "RCPT TO:<$i>"
+			((count = count + 1))
+		done
+		state=3
+	elif ((rsp == 250 && state == 3)); then
+		((count = count - 1))
+		((count > 0)) && continue
+		send "DATA"
+		sed "s|^\.|..|" "$2" | tee -a "$LOGS"
+		send "."
+		state=4
+	elif ((rsp == 250 && state == 4)); then
+		send "QUIT"
+		exit
+	fi
+done

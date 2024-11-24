@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+
+die() {
+	echo "$@"
+	exit 1
+}
+
+source "lib/utils"
+setname "Control"
+
+# Setp environment
+source "lib/paths"
+cd "$root_d" || die "Could not find root directory $root_d"
+rm -rf "$tmp_d"
+mkdir "$tmp_d"
+touch "$frecv_f" "$lines_f" "$log_f"
+# only create fsend_f when a connection exists
+
+raw_token="$(< "$token_f")"
+token="${raw_token#Bot }"
+
+source "config"
+source "lib/functions"
+
+cleanup() {
+	rm -f "$fsend_f" "$frecv_f" "$running_f" "$heartbeat_no_ack_f"
+}
+trap cleanup EXIT
+
+work "0" "Requesting gateway from REST API..."
+gateway_res="$(
+	curl -sL "https://discord.com/api/v8/gateway" \
+	| tee -a "$lines_f"
+)"
+echo >> "$lines_f"
+gateway="$(jq -r ".url" <<< "$gateway_res")"
+ping_url="${gateway#wss://}"
+info "0" "Response is $gateway_res, URL is $gateway"
+work "0" "Testing gateway..."
+ping -c 1 "$ping_url" >/dev/null 2>&1 || {
+	crit "0" "Could not ping gateway!"
+	work "0" "Sleeping for 5 seconds to allow API to reload..."
+	sleep 5
+	stopall
+}
+gateway="$gateway/?v=8&encoding=json"
+info "0" "Modified gateway to $gateway"
+
+heartbeat_active=0
+# line
+try_heartbeat() {
+	local heartbeat_interval
+
+	work "1" "Trying to load heartbeat"
+	heartbeat_interval="$(echo "$1" | jq -M ".d.heartbeat_interval")"
+	[ "$heartbeat_interval" == "null" ] && warn "1" "Heartbeat failure on line $1" && return
+	heartbeat_interval="$(echo "$heartbeat_interval 1000 / p" | dc)"
+
+	info "1" "Heartbeat initialized with interval ${heartbeat_interval} seconds"
+	heartbeat_active=1
+	heartbeat "$heartbeat_interval" &
+}
+
+heartbeat() {
+	setname "Heartbeat"
+
+	while [ -f "$running_f" ]; do
+		[ -f "$heartbeat_no_ack_f" ] && {
+			crit "1" "No heartbeat ACK after full period!"
+			rm "$heartbeat_no_ack_f"
+			stopall
+			return
+		}
+		[ "$log_heartbeat" == "1" ] && work "1" "Sending heartbeat"
+		touch "$heartbeat_no_ack_f"
+		echo '{"op":1, "d":null}' >> "$fsend_f"
+		inotifywait -qq -e delete_self -t "$1" "$running_f"
+	done
+}
+
+eventloop() {
+	setname "Event loop"
+
+	local line
+	local logged_in=0
+	local t s op d
+
+	info "0" "Event loop initialized"
+	while [ -f "$running_f" ]; do
+		line="$(setname "Receiver"; readlobu "$frecv_f" | tr -d '\0' | sed -E "s|^(> )*||g")"
+		cat >> "$lines_f" <<< "$line"
+		t="" s="" op="" d=""
+		read -r t s op d <<< "$(jq -c -r ".t, .s, .op, .d" <<< "$line" | tr '\n' ' ')"
+
+		# Save sequence number
+		[ "$s" != "null" ] && last_sequence_num="$s"
+
+		# init heartbeat
+		if [ "$heartbeat_active" == "0" ]; then
+			try_heartbeat "$line"
+		fi
+
+		# login on hello
+		if [ "$op" == "10" ]; then
+			info "2" "Received Hello"
+			[ "$logged_in" == "0" ] && {
+				if [ -f "$resume_payload_f" ]; then
+					# work "2" "Resuming last connection..."
+					# tee -a "$fsend_f" < "$resume_payload_f"
+					# rm "$resume_payload_f"
+
+					crit "2" "Resuming currently disabled due to bugs!"
+					rm "$resume_payload_f"
+					stopall
+				else
+					work "2" "Attempting login..."
+					# shellcheck disable=SC2016
+					# nothing to expand
+					printf '{
+						"op": 2,
+						"d": {
+							"token": "%s",
+							"intents": 4608,
+							"properties": {
+								"$os": "linux",
+								"$browser": "foo",
+								"$device": "foo"
+							}
+						}
+					}' "$token" \
+					| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
+					>> "$fsend_f"
+				fi
+			}
+
+		# handle disconnection
+		elif [ "$op" == "7" ]; then
+			crit "2" "We were disconnected!"
+			# resume
+			stopall
+
+		# handle invalid session
+		elif [ "$op" == "9" ]; then
+			crit "2" "Invalid session!"
+			stopall
+
+		# heartbeat_active ACK
+		elif [ "$op" == "11" ]; then
+			[ "$log_heartbeat" == "1" ] && info "1" "Received heartbeat ACK"
+			rm "$heartbeat_no_ack_f"
+
+		# logged in, save session id
+		elif [ "$t" == "READY" ]; then
+			info "2" "Login successful"
+			session_id="$(jq -r ".session_id" <<< "$d")"
+			logged_in=1
+			my_status="online"
+
+		# some defaults
+		elif [ "$t" == "MESSAGE_ACK" ]; then
+			continue
+
+		elif [ "$t" == "MESSAGE_CREATE" ]; then
+			fixmystatus
+			echo "$d"
+			IFS=$'\n' read -r -d '' author author_id content <<< \
+				"$(jq -r ".author.username, .author.id, .content" <<< "$d")"
+			handle_message
+
+		elif [ "$t" == "USER_SETTINGS_UPDATE" ]; then
+			my_status="$(jq -r ".status" <<< "$d")"
+			info "*" "You are now $my_status"
+
+		elif [ "$t" == "PRESENCE_UPDATE" ]; then
+			IFS=$'\n' read -r -d '' username status <<< \
+				"$(jq -r ".user.username, .status" <<< "$d")"
+			info "*" "$username is now $status!"
+
+		else
+			fixmystatus
+			warn "2" "Unhandled event: t = $t s = $s op = $op"
+		fi
+	done
+}
+
+mkfifo "$fsend_f"
+work "0" "Opening connection to gateway..."
+websocket() {
+	setname "wscat"
+
+	wscat -c "$gateway" <"$fsend_f" >"$frecv_f"
+	# if the running file still exists, the websocket was closed remotely
+	# otherwise, it was deleted by stopall so we don't need to run it again
+	[ -f "$running_f" ] && {
+		crit "0" "The websocket was closed!"
+		stopall
+	}
+}
+websocket &
+
+touch "$running_f"
+generic_log "[38;5;5m" "NFTY" "∞" "Infinity is now realized"
+work "0" "Loading event loop..."
+eventloop &
+sleep 1
+
+work "0" "Stabilizing communication channels..."
+while [ -f "$running_f" ]; do
+	inotifywait -qq -e delete_self "$running_f"
+done >"$fsend_f"
+work "0" "Shutting down..."
+pkill -P $$

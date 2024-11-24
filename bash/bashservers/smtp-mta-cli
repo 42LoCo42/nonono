@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC1090
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+source common
+
+accfile="$1"
+source "$accfile"
+declare user pass host port
+
+sender="$2"
+shift 2
+
+(($# < 1)) && out "Error: No recipients!" && exit 1
+
+trap 'rm -f "$tmpfile" "$mailfile"' EXIT
+
+mailfile="$(mktemp)"
+cat > "$mailfile"
+
+tmpfile="$(mktemp)"
+{
+	echo "user='$user'"
+	echo "pass='$pass'"
+	echo "sender='$sender'"
+	for i in "$@"; do
+		echo "recipients+=('$i')"
+	done
+} > "$tmpfile"
+
+coproc stunnel {
+	cat << EOF | stunnel -fd 0 2>&1
+foreground = yes
+
+[smtp]
+exec = ./smtp-mta
+execArgs = ./smtp-mta $tmpfile $mailfile
+client = yes
+connect = $host:$port
+protocol = smtp
+EOF
+}
+declare stunnel_PID
+
+while read -ru "${stunnel[0]}" line; do
+	echo "$line"
+	grep -Eq "Connection closed|Connection reset" <<< "$line" \
+	&& pkill -SIGINT -P "$stunnel_PID" \
+	&& break
+done

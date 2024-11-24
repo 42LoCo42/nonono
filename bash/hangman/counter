@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+grep -o . "${1:-words}" \
+| sort \
+| uniq -c \
+| sort -rn

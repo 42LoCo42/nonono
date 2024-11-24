@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+die() {
+	echo "$@" >&2
+	((showusage)) && usage >&2
+	exit 1
+}
+
+NAME="$(basename "$0")"
+
+usage() {
+	cat << EOF
+Usage: $NAME [OPTION]... TEMPLATE/FILE
+$NAME can run compression commands in parallel to allow for parallel compression,
+even if the compressor itself is single-threaded.
+When in compression mode, it reads the list of files from STDIN (like cpio).
+In decompression mode, it reads the compression command from the input file,
+therefore no template must be specified manually.
+
+	-c FILE  Use a different config file
+	-d       Switch to decompression mode
+	-h       Show this help, then exit
+	-j NUM   Use this many parallel processes for (de-)compression
+	-l DIR   Location of the temporary directory
+	-t       Show all templates, then exit
+	-v       Show version
+EOF
+}
+
+CONFIGFILE="$PWD/pack.conf"
+THREADS="$(nproc)"
+TMPDIR="/tmp"
+
+showusage=1
+while getopts :c:dhj:l:tv arg; do
+	case "$arg" in
+		c) CONFIGFILE="$OPTARG" ;;
+		d) decompress=1 ;;
+		h) usage; exit ;;
+		l) TMPDIR="$OPTARG" ;;
+		j)
+			if grep -Eqx "[0-9]+" <<< "$OPTARG"; then
+				THREADS="$OPTARG"
+			else
+				die "-j needs a number!"
+			fi
+			;;
+		t) showtemplates=1 ;;
+		v) echo; exit ;;
+		:) die "-$OPTARG needs an option!" ;;
+		*) die "Unknown option -$OPTARG" ;;
+	esac
+done
+shift "$((OPTIND - 1))"
+
+field() {
+	tr '	' '\n' <<< "$line" | sed "$1q;d"
+}
+
+declare -A templates
+while read -r line; do
+	templates["$(field 1)"]="$(field 2)	$(field 3)"
+done < "$CONFIGFILE"
+
+((showtemplates)) && {
+	echo "Name	Compressor	Decompressor"
+	for t in "${!templates[@]}"; do
+		echo "$t	${templates[$t]}"
+	done
+} | column -s '	' -t && exit
+
+allfiles() {
+	from="$1"
+	to="$2"
+	line="${templates["$3"]}"
+	cmd=("$(field "$4")")
+
+	fail=0
+	while read -r file; do
+		mkdir -p "$(dirname "$to/$file")"
+		if ((THREADS)); then
+			((THREADS-=1))
+		else
+			wait -n || fail=1
+		fi
+		"${cmd[@]}" < "$from/$file" > "$to/$file" &
+	done
+	while [ -n "$(jobs)" ]; do wait -n || fail=1; done
+	return "$fail"
+}
+
+dir="$(mktemp -d)"
+trap 'pkill -P "$$"; rm -rf "$dir"' EXIT
+
+pack() {
+	allfiles "$PWD" "$dir" "$1" 1
+	echo "$?"
+}
+
+unpack() {
+	allfiles "$dir" "$PWD" "$1" 2
+	echo "$?"
+}
+
+if ((decompress)); then
+	unpack "$1"
+else
+	pack "$1"
+	pause
+fi

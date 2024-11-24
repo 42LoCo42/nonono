@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+
+cd /etc/X11 || exit 1
+unlink xorg.conf
+if grep -q "vfio-pci.ids=10de:1c82" /proc/cmdline; then
+	ln -sf xorg.conf.intel xorg.conf
+else
+	ln -sf xorg.conf.nvidia xorg.conf
+fi

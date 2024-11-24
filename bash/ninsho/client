@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -eu
+username="$1"
+publickey="$2"
+secretkey="$3"
+shift 3
+
+# build netcat args
+nc_args=()
+while [ "$1" != "--" ]; do
+	nc_args+=("$1")
+	shift
+done
+
+# build program args
+cmd="$1"
+shift
+
+trap 'pkill -P $$' EXIT
+coproc nc (nc "${nc_args[@]}")
+
+# generate & send request
+client_nonce="$(base64 -w 0 "/dev/urandom" | head -c 16)"
+echo "$username $client_nonce" >&"${nc[1]}"
+
+# receive server nonce
+read -ru "${nc[0]}" server_nonce
+
+# build & send login string
+{
+	echo "$username" "$client_nonce" "$server_nonce" \
+	| est -s "$publickey" "$secretkey" \
+	| base64 -w 0
+	echo
+} >&"${nc[1]}"
+
+# switch to real program
+exec "$cmd" "$@" <&"${nc[0]}" >&"${nc[1]}"

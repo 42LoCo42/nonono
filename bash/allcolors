@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+blocks() {
+	for i in {0..7}; do
+		printf '\e[%s3%dm███' "$1" "$i"
+	done
+	printf '   '
+	for i in {0..7}; do
+		printf '\e[%s9%dm███' "$1" "$i"
+	done
+	printf '\e[m\n'
+}
+
+printf "        default                    light\ndefault "
+blocks
+printf "faint   "
+blocks "2;"

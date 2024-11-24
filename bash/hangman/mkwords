@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+{
+	curl 'https://www.wordgamedictionary.com/english-word-list/download/english.txt'
+	echo
+} \
+| dos2unix \
+| tr '[:upper:]' '[:lower]' \
+| grep -Ex '[a-z]*' \
+| sort -u > words
+
+du -h words
+wc -l words

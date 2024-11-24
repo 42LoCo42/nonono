@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+shopt -s nullglob
+me="$(realpath "${BASH_SOURCE[0]}")"
+for i in ./*.zip; do
+	d="${i%.zip}"
+	mkdir "$d"
+	unzip "$i" -d "$d"
+	rm "$i"
+	{
+		cd "$d" || exit 1
+		$me
+	} &
+done

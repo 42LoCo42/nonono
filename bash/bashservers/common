@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2155
+NAME="$(basename "${BASH_SOURCE[1]}")"
+ROOT="$PWD/$NAME.root"
+LOGS="$PWD/logs/$NAME"
+
+bstrip() {
+	# empty line
+	[ -z "$1" ] && echo && return
+	# mac
+	[ "${1: -1}" == $'\r' ] && echo "${1: 0: $((${#1} - 1))}" && return
+	# windows
+	[ "${1: -2}" == $'\r\n' ] && echo "${1: 0: $((${#1} - 2))}" && return
+	# unix
+	[ "${1: -1}" == $'\n' ] && echo "${1: 0: $((${#1} - 1))}" && return
+	# other
+	echo "$1"
+}
+
+bq() {
+	sed "s|\?|\\\?|g; s|\*|\\\*|g" <<< "$*"
+}
+
+# needle haystack
+subindex() {
+	local pattern rest
+	pattern="$(bq "$1")"
+	rest="${2#*$pattern}"
+	echo "$((${#2} - ${#rest} - ${#1}))"
+}
+
+log() {
+	echo "$@" >> "$LOGS"
+}
+
+out() {
+	echo "$@" > /dev/tty
+}
+
+send() {
+	echo "$@" | tee -a "$LOGS"
+}
+
+run_resource() {
+	local cmd="$1"
+	shift
+	local out="$(mktemp)"
+	local err="$(mktemp)"
+	"$cmd" "$@" >"$out" 2>"$err"
+	echo "$out $err"
+}

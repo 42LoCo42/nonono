@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+warn() {
+	echo "$@" >&2
+}
+
+warn "> $1"
+req=
+while [ -z "$req" ]; do
+	req="$(curl -sSL "https://api.curseforge.com$1" -H "Accept: application/json" -K "key")"
+done
+echo "$req"

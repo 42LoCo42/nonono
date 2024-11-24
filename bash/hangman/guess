@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+word="${1:-happiness}"
+mask="${word//?/.}"
+guessed=()
+
+# place newChar
+change() {
+	# shellcheck disable=SC2001
+	mask="$(sed "s|.|$2|$(($1 + 1))" <<< "$mask")"
+}
+
+currentHighest() {
+	candidates="$(grep -x "$mask" words)"
+	if [ -z "$candidates" ]; then
+		echo "0 candidates"
+	else
+		echo "$(wc -l <<< "$candidates") candidates"
+	fi >&2
+
+	./counter - <<< "$candidates" \
+	| awk '{print $2}' \
+	| while read -r letter; do
+		grep -q "$letter" <<< "${guessed[*]}" || {
+			echo "$letter"
+			break
+		}
+	done
+}
+
+# guessedChar
+applyGuess() {
+	guessed+=("$1")
+
+	for i in $(seq 0 "$((${#word} - 1))"); do
+		if [ "${word:$i:1}" == "$1" ]; then
+			change "$i" "$1"
+		fi
+	done
+}
+
+figures=(
+	""
+	"o"
+	"o-"
+	"o-´"
+	"o-<"
+	"o-<-´"
+	"o-<-<"
+)
+failures=0
+
+clear
+while grep -Fq . <<< "$mask"; do
+	echo -n "[H"
+	guess="$(currentHighest)"
+	[ -z "$guess" ] && {
+		echo "OUT OF GUESSES"
+		break
+	}
+	echo "guessing $guess"
+
+	oldMask="$mask"
+	applyGuess "$guess"
+
+	if [ "$mask" == "$oldMask" ]; then
+		((failures++))
+		((failures >= ${#figures[@]})) && \
+			failures="$((${#figures[@]} - 1))"
+		result="FAIL"
+	else
+		result=" OK "
+	fi
+	echo "result: $mask [$result] ${figures[failures]}"
+
+	echo
+done

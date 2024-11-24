@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+
+git pull
+
+while true; do
+	cat << EOF
+
+Bashbot by Leon Schumacher
+Last commit hash: $(git rev-parse --short HEAD)
+Last commit mesg: $(git log --oneline --no-merges -1 --format=%s)
+Now starting...
+
+EOF
+	bash "lib/main"
+done

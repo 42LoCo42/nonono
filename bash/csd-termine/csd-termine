@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+today="$(date +"%Y%m%d")"
+
+rm ./*.ics
+touch "empty.ics" # needed so grep outputs file names
+
+echo "Downloading $(wc -l "regions")..."
+grep -v '^#' "regions" \
+| while read -r region; do
+	curl -sL "https://www.csd-termine.de/$region?ics" -o "${region//\//_}.ics"
+done
+
+dos2unix -q ./*.ics
+
+grep -A3 "SUMMARY" ./*.ics \
+| awk -F: '
+	/SUMMARY/ {printf "%s	", $3}
+	/VALUE/ {print $2}
+' \
+| sort -k2 -t '	' \
+| while IFS='	' read -r name date; do
+	((date < today)) && continue
+	# name="$(sed -E 's|^CSD ||; s| [0-9]{4}$||' <<< "$name")"
+	echo "$name	$(date -d "$date" +"%A, %d. %B %Y")"
+done \
+| column -ts '	'

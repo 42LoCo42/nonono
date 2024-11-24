@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+declare -A entries
+declare -a values
+index=-1
+chars="abcdefghijklmnopqrstuvwxyz0123456789"
+shifted="ABCDEFGHIJKLMNOPQRSTUVWXYZ=!\"§$%&/()"
+while read -r line; do
+	((index >= 35)) && continue
+	((index = index + 1))
+	entries[${chars: $index: 1}]="$line"
+	values[index]=0
+done
+exec 3< "/dev/tty"
+
+readc() {
+	local saved_tty_settings
+	saved_tty_settings="$(stty -F "/dev/tty" -g)"
+	stty -F "/dev/tty" -icanon -echo
+	key="$(dd if="/dev/tty" bs=1 count=1 2>/dev/null; echo .)"
+	key="$(bq "$key")"
+	key="${key%.}"
+	stty -F "/dev/tty" "$saved_tty_settings"
+}
+
+bq() {
+	sed "s|\?|\\\?|g; s|\*|\\\*|g" <<< "$*"
+}
+
+# needle haystack
+subindex() {
+	local rest
+	rest="${2#*"$1"}"
+	echo "$((${#2} - ${#rest} - ${#1}))"
+}
+
+print_entries() {
+	printf '[2J[H'
+	for i in $(seq 0 "$index"); do
+		char="${chars: $i: 1}"
+		case "${values[$i]}" in
+			-1) : "[31m[n]" ;;
+			0)  : "[30m---" ;;
+			1)  : "[32m[Y]" ;;
+		esac
+		echo "[1m[34m$char) $_[m ${entries[$char]}"
+	done
+}
+
+print_entries
+while readc; do
+	[ "$key" == $'\n' ] && break
+	adjust=1
+	pos="$(subindex "$key" "$chars")"
+	((pos < 0)) && pos="$(subindex "$key" "$shifted")" && adjust=-1
+	( ((pos < 0)) || ((pos > index)) ) && continue
+	next=$((${values[$pos]} + adjust))
+	( ((next > 1)) || ((next < -1)) ) && continue
+	values[pos]=$next
+	print_entries
+done
+
+for i in $(seq 0 "$index"); do
+	echo "${values[$i]} ${entries[${chars: $i: 1}]}"
+done | grep -v "^0 "

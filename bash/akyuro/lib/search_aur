@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# keywords
+search_aur() {
+	local base_keyword="$1"
+	shift
+	log "Querying aurweb RPC"
+	curl -s "https://aur.archlinux.org/rpc/?v=5&type=search&arg=$base_keyword" |
+	jq '.results[] | .Name, .Version, .NumVotes,
+		.Popularity, .Maintainer, .OutOfDate, .Description' |
+	tr -d '"' | join_n_lines 7 "$SEPARATOR" | refine_search "$@" |
+	sort -t "$SEPARATOR" -k 3 -n -r |
+	sed -E "s|(.)$|\1aur${SEPARATOR}|g" |
+	on_field 3 "$SEPARATOR" sed -E 's|^(.)|+\1|g' |
+	on_field 4 "$SEPARATOR" xargs printf "%0.2f"
+}
+
+# package
+download_aur_package() {
+	rm -rf "$1"
+	git clone "https://aur.archlinux.org/$1.git" "$1"
+	cd "$1" || die "Couldn't get git repo for PKGBUILD of $1"
+	update_aur_package
+}
+
+update_aur_package() {
+	# create sources file
+	find . -mindepth 1 -maxdepth 1 ! -path '*.git*' ! -name '.SRCINFO' ! -name "sources" > "sources"
+	rm -rf "files"
+	mkdir "files"
+	while read -r source; do
+		mv "$source" "files/"
+	done < "sources"
+	sed -E 's|^./|files/|g' -i "sources"
+
+	# create version file
+	source "files/PKGBUILD"
+	echo "$pkgver $pkgrel" > version
+
+	# create checksums file
+	sha256sum "files/"* > checksums
+
+	# copy build script
+	cp "$LIBDIR/build_aur" "build"
+	sed "s|#AKYURO_EXT#|${LIBDIR}/akyuro-ext|g" -i build
+}

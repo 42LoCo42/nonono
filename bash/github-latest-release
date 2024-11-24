@@ -1,0 +1,11 @@
+#!/usr/bin/sh
+url="$(
+	curl -s "https://api.github.com/repos/$1/$2/releases/latest" \
+	| grep -F "tarball_url" | cut -d\" -f4
+)"
+file="$(basename "$url")"
+curl -LO "$url"
+mv "$file" "$file.tgz"
+gzip -d "$file.tgz"
+tar xvf "$file.tar"
+rm "$file.tar"

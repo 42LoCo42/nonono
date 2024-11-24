@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+file="list"
+len=42
+iter=1
+correct=0
+
+time_s="$(date +"%M %S %N")"
+for _ in $(seq 1 "$iter"); do
+	list="$(sort -R "$file" | sed "${len}q")"
+	hira="$(echo "$list" | awk -F ':' '{print $1}' | tr -d '\n')"
+	roma="$(echo "$list" | awk -F ':' '{print $2}' | tr -d '\n')"
+
+	echo "$hira"
+	read -r input
+	if [ "$input" == "$roma" ]; then
+		echo "Correct!"
+		((correct = correct + 1))
+	else
+		echo "Incorrect!"
+		echo "$roma"
+	fi
+done
+time_e="$(date +"%M %S %N")"
+
+echo -n "Duration: "
+cat << EOF | dc
+[3 0 r-R]sa
+[1000000 / lax 1000 * lax 60000 * ++]sb
+$time_e
+lbx
+$time_s
+lbx
+- n[ ms]p
+EOF
+
+echo "$correct out of $iter iterations successful!"

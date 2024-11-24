@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+:() {
+    local cmd
+    cmd="$1"
+    shift
+    nohup "$cmd" "$@" >/dev/null &
+}
+
+grep -E "    [^\*]\)" "$0" | sed "s|    ||g; s|) ||g; s| ;;||g"
+stty -echo
+read -rn1 input
+[ "$input" == "^D" ] && exit
+case "$input" in
+    d) : discord ;;
+    f) : firefox ;;
+    q) : qutebrowser ;;
+    s) : steam ;;
+    v) : vlc ;;
+    t) : st ;;
+    *) true ;;
+esac
+stty echo

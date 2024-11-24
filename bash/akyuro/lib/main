@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+
+declare -r SEPARATOR=""
+declare -r LIBDIR="$PWD"
+declare -r MAINDIR="$HOME/builds/akyuro-dev/maindir" # /var/db/akyuro
+declare -r PACKAGES="$MAINDIR/packages"
+declare -r MIRRORLIST="$MAINDIR/mirrorlist"
+declare -r REPOLIST="$MAINDIR/repolist"
+# shellcheck disable=SC2155
+declare -r TMPDIR="$(mktemp -d "/tmp/akyuro.XXXXXXXX")"
+declare -r LOCKFILE="$TMPDIR/lock"
+
+touch "$LOCKFILE"
+
+export LC_ALL="C"
+
+cleanup() {
+	rm -rf "$TMPDIR"
+}
+
+trap cleanup EXIT
+
+log() {
+	echo "$@" >&2
+}
+
+die() {
+	echo "$1"
+	exit 1
+}
+
+is_no_number() {
+	case $1 in
+		''|*[!0-9]*) true ;;
+		*) false ;;
+	esac
+}
+
+refine_search() {
+	local input
+	IFS= read -r -d '' input
+	for i in "$@"; do
+		input="$(echo "$input" | grep -i "$i")"
+	done
+	echo -n "$input"
+}
+
+declare -r TIOCSTI="$PWD/tiocsti"
+
+tiocsti() {
+	stty -echo
+	# shellcheck disable=SC2059
+	echo -n "$@" | "$TIOCSTI"
+	stty echo
+}
+
+tiocsti_n() {
+	tiocsti -e "$@" "\n"
+}
+
+[ -f "tiocsti" ] || {
+	read -r -p "Use tiocsti subsystem? [Y/n] " in
+	case "$in" in
+		""|y*|j*)
+			cc "$TIOCSTI.c" -o "$TIOCSTI"
+			which strip >/dev/null 2>&1 && strip "$TIOCSTI"
+		;;
+		*)
+			:>"$TIOCSTI"
+			chmod +x "$TIOCSTI"
+		;;
+	esac
+	echo "Delete $TIOCSTI to retake this choice."
+}
+
+source utils
+source search_aur
+source search_arch
+source choose_package
+
+cd "$MAINDIR" || die "$MAINDIR not found!"
+
+(($# == 0)) && die "Update all"
+
+[ -f "repolist" ] || die "No repolist in $PWD"
+[ -f "mirrorlist" ] || die "No mirrorlist in $PWD"
+
+IFS=$'\n' read -r -d '' -a arch_packages <<< "$(search_arch "$@")"
+IFS=$'\n' read -r -d '' -a aur_packages <<< "$(search_aur "$@")"
+wait
+
+packages=("${arch_packages[@]}" "${aur_packages[@]}")
+mkdir -p "$PACKAGES"
+cd "$PACKAGES" || die "Package folder $PACKAGES not found"
+choose_package

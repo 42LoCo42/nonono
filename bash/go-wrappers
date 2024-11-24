@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+grep -hERA1 --no-group-separator "^//export " \
+| awk 'NR % 2 == 0' \
+| tr '()' ' ' \
+| tr -d ',{' \
+| while read -r line; do
+	mapfile -t parts < <(sed -E 's| +|\n|g' <<< "$line")
+
+	[ "${parts[0]}" == "func" ] || {
+		echo "Not a function"
+		continue
+	}
+
+	name="${parts[1]}"
+	echo "$name"
+
+	for i in $(seq 2 $((${#parts[@]} - 1))); do
+		echo "$i"
+	done
+done

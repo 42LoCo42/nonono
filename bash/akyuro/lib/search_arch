@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+# url
+download_url() {
+	case "$1" in
+		http*)
+			curl -s -LO "$1" -z "$(basename "$1")"
+		;;
+		rsync*)
+			rsync -tL "$1" . >/dev/null
+		;;
+	esac
+}
+
+# repo filename
+download_from_arch_repo() {
+	local line
+	while read -r line; do
+		line="${line//\$repo/$1}/$2"
+		download_url "$line" && break
+	done < "$MIRRORLIST"
+}
+
+check_dbs() {
+	local repo
+	while read -r repo; do
+		log "Syncing $repo"
+		download_from_arch_repo "$repo" "$repo.db"
+	done < "$REPOLIST"
+}
+
+# repo name
+echo_pkg_name() {
+	{
+		flock 3
+		printf "%s " "$1"
+		tar tf "$1" | grep -E "$2-[^/]+/$" | tr -d '/'
+	} 3<"$LOCKFILE" >> "names"
+}
+
+# repo line
+get_pkg_name_from_desc() {
+	local i pkg
+	for ((i = $2; i > 0; i--)); do
+		sed "${i}q;d" "$1" | grep -q ".pkg" || continue
+		{
+			flock 3
+			printf "%s " "$1"
+			sed "${i}q;d" "$1" \
+			| rev | cut -d '-' -f 2- \
+			| rev
+		} 3<"$LOCKFILE" >> "descs"
+		return
+	done
+}
+
+# desc_file repo
+read_desc_file() {
+	grep -A1 "%NAME%"       "$1" | tail -n+2
+	grep -A1 "%VERSION%"    "$1" | tail -n+2
+	grep -A1 "%CSIZE%"      "$1" | tail -n+2 | awk '{print $1/1048576}' | xargs printf "%0.1f MiB\n"
+	grep -A1 "%ISIZE%"      "$1" | tail -n+2 | awk '{print $1/1048576}' | xargs printf "%0.1f MiB\n"
+	grep -A1 "%PACKAGER%"   "$1" | tail -n+2
+	echo "null"
+	grep -A1 "%DESC%"       "$1" | tail -n+2
+	echo "$2"
+
+}
+
+# keywords
+search_arch() {
+	local kw="$1" repo pkg i
+	shift
+
+	check_dbs
+	pushd "$TMPDIR" >/dev/null || exit 1
+	touch "names" "descs"
+
+	# search in all repos
+	while read -r repo; do
+		{
+			zcat "$MAINDIR/$repo.db" > "$repo"
+			mkdir -p "$repo-pkgs"
+			# search names
+			{
+				for i in $(
+					pcre2grep -aniM "%NAME%\n.*$kw.*" "$repo" \
+					| join_n_lines 2 "$SEPARATOR" \
+					| refine_search "$@" | cut -d "$SEPARATOR" -f 2
+				); do
+					echo_pkg_name "$repo" "$i" &
+				done
+				wait
+			} &
+			# search descriptions
+			# {
+			# 	for i in $(
+			# 		pcre2grep -aniM "%DESC%\n.*$kw.*" "$repo" \
+			# 		| join_n_lines 2 "$SEPARATOR" \
+			# 		| refine_search "$@" | cut -d ':' -f 1
+			# 	); do
+			# 		get_pkg_name_from_desc "$repo" "$i" &
+			# 	done
+			# 	wait
+			# } &
+			wait
+		} &
+	done < "$REPOLIST"
+	wait
+
+	cat "names" "descs" > "allnames"
+
+	# extract package desc files
+	while read -r repo pkg; do
+		[ -z "$pkg" ] && continue
+		{
+			tar xf "$repo" "$pkg" 2>/dev/null && mv "$pkg" "$repo-pkgs"
+		} &
+	done <<< "$(sort -u "allnames")"
+	wait
+
+	# read all desc files
+	while read -r pkg; do
+		[ -z "$pkg" ] && continue
+		# shellcheck disable=SC2001
+		read_desc_file \
+			"$pkg/desc" \
+			"$(echo "${pkg%-pkgs/*}" | sed 's|./||g')" \
+		| join_n_lines 8 "$SEPARATOR"
+	done <<< "$(
+		find . -maxdepth 2 -mindepth 2 -type d
+	)" | sort -t "$SEPARATOR" -k 8,8r -k 1,1
+
+	popd >/dev/null || exit 1
+}
+
+# package version repo
+download_arch_package() {
+	rm -rf "$1"
+	mkdir -p "$1/files"
+	cd "$1" || die "Couldn't create package directory $PWD/$1"
+
+	# create sources file
+	cp "$TMPDIR/$3-pkgs/$1-$2/desc" "files"
+	echo "files/desc" > "sources"
+
+	# create version file
+	echo -n "${2%\-*} " > "version"
+	echo "${2##*\-}" >> "version"
+
+	# create checksums file
+	sha256sum "files/desc" > "checksums"
+
+
+	# copy build script
+	cp "$LIBDIR/build_arch" "build"
+	sed "s|#AKYURO_EXT#|${LIBDIR}/akyuro-ext|g" -i build
+	sed "s|#MIRRORLIST#|${MIRRORLIST}|g" -i build
+	sed "s|#REPO#|${3}|g" -i build
+
+}

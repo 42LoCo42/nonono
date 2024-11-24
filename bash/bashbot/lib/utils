@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+source "lib/paths"
+
+# name...
+setname() {
+	# shellcheck disable=SC2059
+	printf "$@" > /proc/self/comm
+}
+
+# color type ID msg
+generic_log() {
+	printf "[1m[%s%s[38;5;15m] [%s] [%s] %s%s[m\n" \
+		"$1" "$2" "$3" "$(date +"%a %b %d %T %Z %Y")" "$1" "$4" \
+	| tee -a "$log_f"
+}
+
+# ID msg
+work() {
+	generic_log "[38;5;4m" "WORK" "$1" "$2"
+}
+
+# ID msg
+info() {
+	generic_log "[38;5;2m" "INFO" "$1" "$2"
+}
+
+# ID msg
+warn() {
+	generic_log "[38;5;3m" "WARN" "$1" "$2"
+}
+
+# ID msg
+crit() {
+	generic_log "[38;5;1m" "CRIT" "$1" "$2"
+}
+
+# file
+readlobu() {
+	setname "readlobu"
+
+	while [ -f "$running_f" ]; do
+		if grep -zqP "\n" "$1"; then
+			{
+				flock -x 3
+				sed 1q "$1"
+				printf '\0' >"$1"
+			} 3<>"$1"
+			break
+		else
+			inotifywait -qq -e modify "$1"
+		fi
+	done
+}
+
+fixmystatus() {
+	: "${my_status:=online}"
+}
+
+stopall() {
+	rm -f "$running_f"
+	printf '\x4' >> "$fsend_f"
+	generic_log "[38;5;5m" "NFTY" "ø" "Infinity is now diminished"
+}
+
+declare token session_id last_sequence_num
+
+resume() {
+	work "2" "Creating resume payload..."
+	printf '{
+		"op": 6,
+		"d": {
+			"token": "%s",
+			"session_id": "%s",
+			"seq": "%s"
+		}
+	}' "$token" "$session_id" "$last_sequence_num" \
+	| tr -d "[:space:]" | sed -E 's|(.)$|\1\n|g' \
+	> "$resume_payload_f"
+	stopall
+}
+

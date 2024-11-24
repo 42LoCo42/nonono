@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+gameVersion="$1"
+modLoaderType="Forge"
+shift
+modSlugs=("$@")
+P=20
+key="$(dirname "$(realpath "$0")")/key"
+
+warn() {
+	echo "$@" >&2
+}
+
+req() {
+	warn "> $1"
+	curl -sLS "https://api.curseforge.com$1" -H "Accept: application/json" -H "x-api-key: $(< "$key")"
+}
+
+need() {
+	if [ -n "$1" ]; then
+		warn "$2 = $1"
+	else
+		warn "No $2 found!"
+		return 1
+	fi
+}
+
+all() {
+	res=
+	i=0
+	while true; do
+		this="$(req "$1index=$((i * P))")"
+		res+="$this"
+		((i++))
+		(("$(jq ".pagination.resultCount" <<< "$this")" < P)) && break
+	done
+	echo "$res"
+}
+
+gameId="$(
+	all "/v1/games?" \
+	| jq '.data[] | select(.name | match("^Minecraft$")) | .id'
+)"
+need "$gameId" "Game ID" || exit 1
+
+for modSlug in "${modSlugs[@]}"; do
+	{
+		modId="$(
+			all "/v1/mods/search?gameId=$gameId&gameVersion=$gameVersion&modLoaderType=$modLoaderType&searchFilter=$modSlug&" \
+			| jq '.data[] | select(.links.websiteUrl | match("/mc-mods/'"$modSlug"'$")) | .id'
+		)"
+		need "$modId" "Mod ID" || exit
+
+		modName="$(req "/v1/mods/$modId" | jq -r '.data.name')"
+		need "$modName" "Mod Name" || exit
+
+		echo "$modSlug $modId $modName"
+	} &
+done
+wait
