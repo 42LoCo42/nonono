@@ -1,0 +1,4 @@
+htmldocs/
+brainfuck
+programs/*
+!programs/*.b
