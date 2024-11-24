@@ -1,0 +1,5 @@
+UseTab: AlignWithSpaces
+IndentWidth: 4
+TabWidth: 4
+PointerAlignment: Left
+BreakBeforeBraces: Attach
