@@ -1,0 +1,14 @@
+greet: Text -> Text
+greet name = "Hi " ++ name
+
+> greet "user"
+
+unique ability Foo where foo: Nat
+
+useFoo: () -> {Foo} Nat
+useFoo _ = foo
+
+runFoo: Nat
+runFoo = handle !useFoo with impl
+
+> runFoo

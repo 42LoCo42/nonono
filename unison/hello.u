@@ -1,0 +1,33 @@
+hello : '{IO, Exception} ()
+hello = do
+  printLine "What's your name?"
+  name = !console.getLine
+  printLine ("Hello " ++ name)
+
+glance.double : Nat -> Nat
+glance.double x = x * 2
+
+> glance.double 42
+> List.range 0 10
+  |> map (x -> x * 100)
+  |> filter (x -> mod x 2 == 0)
+  |> foldLeft (+) 0
+
+nonZero : Nat -> {Exception} Nat
+nonZero = cases
+  n
+    | n == 0    -> raise (failure "Zero was found" n)
+    | otherwise -> n
+
+> catch '(nonZero 42)
+> catch '(nonZero 0)
+
+getRandomElem : [a] -> {Random} a
+getRandomElem list =
+  index = natIn 0 (size list)
+  unsafeAt index list
+
+> splitmix 2 '(range 0 10 |> getRandomElem)
+
+> hmacBytes Sha3_512 (toUtf8 "0") (toUtf8 "foobar")
+> hashBytes Sha3_512 (toUtf8 "foobar")

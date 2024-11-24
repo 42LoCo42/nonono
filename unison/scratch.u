@@ -1,0 +1,24 @@
+square : Nat -> Nat
+square x = x * x
+
+test> square.tests.ex1 = check (square 4 == 16)
+test> square.tests.prop1 =
+	go _ =
+		a = !gen.nat
+		b = !gen.nat
+		expect (square a * square b == square (a * b))
+	runs 100 go
+
+metadata.licenses.leonsch =
+	License [copyrightHolders.leonsch] [Year 2022] <| LicenseType [:
+		abc foo bar baz
+	:]
+
+foo : (a -> Boolean) -> a -> {Abort, Store a} a
+foo fn a =
+	a = Store.get
+	Store.put a
+	if fn a then abort else a
+
+> withInitialValue 3 '(toDefault! '42 '(foo isOdd 1))
+> hashBytes Sha3_512 (toUtf8 "abc")
