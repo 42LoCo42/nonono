@@ -1,0 +1,4 @@
+  New game  
+  Load saved game  
+  Options  
+  Quit  

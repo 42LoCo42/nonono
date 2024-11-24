@@ -1,0 +1,23 @@
+EEEEEEEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBB           CCCCCCCCCCCCC       GGGGGGGGGGGGG
+E::::::::::::::::::::EB::::::::::::::::B       CCC::::::::::::C    GGG::::::::::::G
+E::::::::::::::::::::EB::::::BBBBBB:::::B    CC:::::::::::::::C  GG:::::::::::::::G
+EE::::::EEEEEEEEE::::EBB:::::B     B:::::B  C:::::CCCCCCCC::::C G:::::GGGGGGGG::::G
+  E:::::E       EEEEEE  B::::B     B:::::B C:::::C       CCCCCCG:::::G       GGGGGG
+  E:::::E               B::::B     B:::::BC:::::C             G:::::G              
+  E::::::EEEEEEEEEE     B::::BBBBBB:::::B C:::::C             G:::::G              
+  E:::::::::::::::E     B:::::::::::::BB  C:::::C             G:::::G    GGGGGGGGGG
+  E:::::::::::::::E     B::::BBBBBB:::::B C:::::C             G:::::G    G::::::::G
+  E::::::EEEEEEEEEE     B::::B     B:::::BC:::::C             G:::::G    GGGGG::::G
+  E:::::E               B::::B     B:::::BC:::::C             G:::::G        G::::G
+  E:::::E       EEEEEE  B::::B     B:::::B C:::::C       CCCCCCG:::::G       G::::G
+EE::::::EEEEEEEE:::::EBB:::::BBBBBB::::::B  C:::::CCCCCCCC::::C G:::::GGGGGGGG::::G
+E::::::::::::::::::::EB:::::::::::::::::B    CC:::::::::::::::C  GG:::::::::::::::G
+E::::::::::::::::::::EB::::::::::::::::B       CCC::::::::::::C    GGG::::::GGG:::G
+EEEEEEEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBB           CCCCCCCCCCCCC       GGGGGG   GGGG
+
+
+Eventful Binary Combination Game
+Special recombobulated edition
+Installed DLCs: 1337
+================================
+
