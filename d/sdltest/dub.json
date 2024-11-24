@@ -1,0 +1,13 @@
+{
+	"authors": [
+		"Leon Schumacher"
+	],
+	"copyright": "Copyright © 2022, Leon Schumacher",
+	"dependencies": {
+		"bindbc-sdl": "~>1.1.2"
+	},
+	"versions": ["SDL_2020"],
+	"description": "Playing with SDL2",
+	"license": "GPLv3",
+	"name": "sdltest"
+}
