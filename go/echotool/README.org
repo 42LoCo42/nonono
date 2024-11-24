@@ -1,0 +1,65 @@
+* echotool
+Helper functions for working with [[https://echo.labstack.com/][echo]] - a web framework for Go.
+
+* Features
+- HTTP error helper (=Die=)
+- request logging
+- static file loading from the =static= directory
+- user authentication: password login →  JWT (=Auth= middleware)
+  #+begin_src shell
+    curl localhost:8080/api/login -d username=user -d password=pass -c cookie
+    # the Login endpoint returns the auth JWT as string
+    # and also sets the auth cookie to that JWT
+  #+end_src
+- when an empty JWT key is passed, =SetupDefaultEcho= will print one and return =nil=
+
+* Usage
+#+begin_src go
+  import (
+      "embed"
+      "net/http"
+
+      "github.com/42LoCo42/echotool"
+  )
+
+  //go:embed static
+  var embedFS embedFS
+
+  type User struct {
+      Name string
+      Hash string
+  }
+
+  func main() {
+      e, api := echotool.SetupDefaultEcho(
+          http.FS(embedFS), // directory for static files (can be nil to read from disk)
+
+          os.Getenv("JWT_KEY_VAR"), // auth token key
+          "appname",                // auth token issuer
+          time.Hour*24,             // auth token lifetime
+
+          func(name string) (*User, error) {
+              // find a user by name
+              panic("TODO implement this!")
+          },
+
+          // get a user's hash
+          func(user *User) (string, error) {
+              return user.Hash, nil
+          },
+      )
+      if e == nil {
+          os.Exit(1)
+      }
+
+      e.GET("/example", func(c echo.Context) error {
+          return c.JSON(http.StatusOK, c.Get("user"))
+      }, echotool.Auth) // this endpoint requires authentication
+
+      e.GET("/error", func(c echo.Context) error {
+          return echotool.Die(http.StatusInternalServerError, nil, "error message")
+      })
+
+      e.Start(":8080")
+  }
+#+end_src

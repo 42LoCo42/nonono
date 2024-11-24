@@ -1,0 +1,6 @@
+/.direnv
+/generated
+*.opus
+*.db
+/api
+/result

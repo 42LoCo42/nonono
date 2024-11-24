@@ -1,0 +1,25 @@
+* svelte-vite-go-nix
+Trying out:
+- [[https://svelte.dev/][Svelte]] as the frontend, with...
+- [[https://vite.dev/][Vite]] as the builder & dev server
+- [[https://echo.labstack.com/][Echo]] as the backend
+- and [[https://nixos.org/][Nix]] to manage the whole thing
+
+woah that's a lot of stuff!
+
+for development:
+#+begin_src shell
+  nix shell # or use nix-direnv
+  dev       # runs vite & air
+#+end_src
+
+for production:
+#+begin_src shell
+  nix build
+#+end_src
+
+as it should be!
+
+** Interesting things to look at
+- [[file:vite.config.ts]] - =/api= requests are proxied to the backend server
+- [[file:config.prod.go][config.prod.go]] - in production builds, the compiled frontend gets embedded here

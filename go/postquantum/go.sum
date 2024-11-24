@@ -1,0 +1,6 @@
+github.com/42LoCo42/z85m v0.0.0-20221002172057-ad76ab18fd2c h1:Zw4E1CKcEyPyRJNQz0x/QEuzElLJPp3RbDwufgdBYAw=
+github.com/42LoCo42/z85m v0.0.0-20221002172057-ad76ab18fd2c/go.mod h1:uij7pK0RRJ65Ck55fUdEQ8ratqleWFcNr5b/aWkTHaA=
+github.com/open-quantum-safe/liboqs-go v0.0.0-20230608150209-05758793295d h1:X6YMuIjUirTr/dTMiwUAakKI+tsJdN057vjQhWARsxE=
+github.com/open-quantum-safe/liboqs-go v0.0.0-20230608150209-05758793295d/go.mod h1:hL1kCRKHsphcZJgKqdcq74kEYLXMv4hgwfx8YkMxpKE=
+github.com/tilinna/z85 v1.0.0 h1:uqFnJBlD01dosSeo5sK1G1YGbPuwqVHqR+12OJDRjUw=
+github.com/tilinna/z85 v1.0.0/go.mod h1:EfpFU/DUY4ddEy6CRvk2l+UQNEzHbh+bqBQS+04Nkxs=

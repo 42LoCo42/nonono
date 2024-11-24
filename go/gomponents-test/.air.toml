@@ -1,0 +1,4 @@
+[build]
+  pre_cmd = [
+    "tailwindcss -i tailwind.css -o static/tailwind.css"
+  ]

@@ -1,0 +1,26 @@
+* ValFile
+- buffer: shared
+- open: default
+- read: from buffer
+- write: to buffer
+- close: decode buffer to value (for use in go)
+* GetFile
+- buffer: private
+- open: executes function, encodes to buffer
+- read: from buffer
+- write: not supported
+- close: delete buffer
+* SetFile
+- buffer: private
+- open: create buffer
+- read: not supported
+- write: to buffer
+- close: decodes from buffer, executes function
+* FuncFile
+- buffer: private
+- open: default
+- read:
+  - on offset 0: inBuffer → function → outBuffer
+  - always: read from outBuffer
+- write: to inBuffer
+- close: delete both buffers

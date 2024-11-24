@@ -1,0 +1,11 @@
+* github-newest-tag
+Get the newest tag of a GitHub repo through the GraphQL API.
+
+Inspired by [[https://stackoverflow.com/a/47502810][this]] Stack Overflow answer.
+
+** Usage
+
+1. Create a new personal access token [[https://github.com/settings/tokens?type=beta][here]]
+2. =export GITHUB_TOKEN=yourtoken=
+   or put it in =.env= when using this repo's devshell
+3. =go run . 42loco42 github-newest-tag= returns =1=. yay!

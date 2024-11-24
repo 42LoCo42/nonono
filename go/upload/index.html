@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Upload</title>
+	</head>
+	<body>
+		<h1>Upload</h1>
+		<form onsubmit="upload(event, 'one')">
+			<input type="file" id="one">
+			<input type="submit" value="Upload file">
+		</form>
+		<br/>
+		<form onsubmit="upload(event, 'all')">
+			<input type="file" id="all" webkitdirectory directory/>
+			<input type="submit" value="Upload directory">
+		</form>
+		<hr/>
+		<div id="log">
+		</div>
+
+		<script>
+			function upload(e, id) {
+				e.preventDefault();
+				log.innerHTML = "";
+
+				const files = document.getElementById(id).files;
+				for(const file of files) {
+					const reader = new FileReader();
+					reader.onload = async (e) => {
+						const path = file.webkitRelativePath || file.name;
+						const url = `http://localhost:8080/upload/${path}`;
+						const res = await fetch(url, {
+							method: "POST",
+							body: e.target.result,
+						});
+						const entry = document.createElement("div");
+						if(res.ok) {
+							entry.textContent = `Uploaded ${path}!`;
+						} else {
+							entry.textContent = `Failed to upload ${path}!`;
+						}
+						log.appendChild(entry);
+					};
+					reader.readAsArrayBuffer(file);
+				}
+			}
+
+			const log = document.getElementById("log");
+		</script>
+	</body>
+</html>

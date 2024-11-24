@@ -1,0 +1,15 @@
+{
+	"foo": {
+		"bar": {
+			"baz": 1337,
+			"quux": 42
+		}
+	},
+	"willMerge": {
+		"$ref": "#/foo/bar",
+		"otherField": "someValue"
+	},
+	"wontMerge": {
+		"$ref": "#/foo"
+	}
+}

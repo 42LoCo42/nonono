@@ -1,0 +1,18 @@
+// -*- mode: go; -*-
+each := func(seq, fn) {
+	for x in seq {
+		fn(x)
+	}
+}
+
+sum := 0
+mul := 1
+
+res := interop("foobar", 4)
+res.Bar = 1337
+println("via println:", res)
+
+each([a, b, c, d], func(x) {
+    sum += x
+    mul *= x
+})
