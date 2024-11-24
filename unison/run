@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-exec ./ucm/ucm --port 6789 --token "kI7w3skV9xSCy6FnNDTxZ6YCYAIHCRv4"
