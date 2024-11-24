@@ -1,0 +1,7 @@
+*.mp3
+/.cache
+/.direnv
+/audio
+/build
+/compile_commands.json
+/result

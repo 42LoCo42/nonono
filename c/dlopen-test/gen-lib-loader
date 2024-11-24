@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+die() {
+	echo "$@"
+	exit 1
+}
+
+header="$1"
+[ -z "$header" ] && die "Provide a header file!"
+[ -f "$header" ] || die "Header $1 not found!"
+name="lib${header%.h}"
+
+syms=()
+
+# include for dynamic loader & library symbol
+cat << EOF
+#include <dlfcn.h>
+void* $name;
+EOF
+
+# function pointers
+while read -r line; do
+	ret="$(sed -E 's|^(.+ )[^ (]+\(.*|\1|' <<< "$line")"
+	sym="$(sed -E 's|.* ([^ (]+)\(.*|\1|' <<< "$line")"
+	args="$(
+		sed -E 's|.*\((.*)\);$|\1|' <<< "$line" \
+		| sed -E 's| [^ ,]+,|,|g; s| [^ ]$||'
+	)"
+	[ -z "$args" ] && args="void"
+
+	syms+=("$sym")
+	echo "$ret(*__${name}_$sym)($args);"
+done <<< "$(sed -En 's|^extern (.*)$|\1|p' "$header")"
+
+# easy call syntax definitions
+for sym in "${syms[@]}"; do
+	echo "#define ${name}_$sym (*__${name}_$sym)"
+done
+
+# init function
+cat << EOF
+int ${name}_init() {
+	$name = dlopen("./$name.so", RTLD_LOCAL | RTLD_LAZY);
+	if($name == 0) {
+		printf("Error: %s\n", dlerror());
+		return 1;
+	}
+EOF
+
+# dlsym calls
+for sym in "${syms[@]}"; do
+	echo "	__${name}_$sym = dlsym($name, \"$sym\");"
+done
+
+# rest of init function
+cat << EOF
+	return 0;
+}
+EOF

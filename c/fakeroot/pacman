@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+root="root"
+pacman="$root/.pacman"
+
+mkdir -p "$pacman/cache"
+ln -sf "/var/lib/pacman/sync" "$pacman"
+
+[ -f "main.so" ] || make
+
+export LD_PRELOAD="./main.so"
+exec pacman \
+	--root     "$root" \
+	--dbpath   "$pacman" \
+	--cachedir "$pacman/cache" \
+	"$@"

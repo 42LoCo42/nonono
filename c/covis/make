@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+compiler="gcc"
+cflags=("-g" "-Wall" "-Wextra")
+lflags=()
+
+# Don't touch anything below this line unless you know what you're doing
+
+build_folder=".build"
+check_folder=".check"
+
+# Find all source files
+read -r -d '' -a source_files <<<\
+	"$(find . -name "*.c" -or -name "*.cpp")"
+
+# Find all directories that are not hidden
+read -r -d '' -a include_dirs <<<\
+	"$(find . -type d | grep -v "/\." | xargs printf "-I%s ")"
+
+# file
+isClean() {
+	local changed
+	check_file="$check_folder/$1.sha1sum"
+	if [ -f "$check_file" ]; then
+		sha1sum -c "$check_file" >/dev/null 2>&1
+		changed="$?"
+		((changed == 1)) && sha1sum "$1" > "$check_file"
+		return "$changed"
+	else
+		sha1sum "$1" > "$check_file"
+		return 1
+	fi
+}
+
+# compile all sources
+for cfile in "${source_files[@]}"; do
+	dir="${cfile%/*}"
+	mkdir -p "$build_folder/$dir" "$check_folder/$dir"
+	if isClean "$cfile"; then
+		echo "SK $cfile"
+	else
+		echo "CC $cfile"
+		found_dirty="true"
+		"$compiler" "${include_dirs[@]}" "${cflags[@]}" \
+		-c "$cfile" -o "$build_folder/$cfile.o"
+	fi
+done
+
+# directory extension
+cleanup() {
+	while read -r file; do
+		source_file="$(echo "$file" | sed "s|^$1/|./|g; s|.$2$||g")"
+		[ -f "$source_file" ] || {
+			echo "RM $file"
+			rm "$file"
+		}
+	done <<< "$(find "$1" -type f)"
+}
+
+# clean up directories
+cleanup "$build_folder" "o"
+cleanup "$check_folder" "sha1sum"
+
+# link all objects
+# shellcheck disable=SC2015
+[ -z "$found_dirty" ] && [ -f "main" ] || {
+	read -r -d '' -a objects <<< "$(find "$build_folder/" -type f)"
+	echo "LD main"
+	"$compiler" "${lflags[@]}" "${objects[@]}" -o "main"
+}

@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+author="Leon Schumacher"
+[ -z "$author" ] && author="$USER"
+
+[ -d ".git" ] || git init
+
+# line_ix command args
+on_line() {
+	local line ix=0 target_ix="$1" cmd="$2"
+	shift; shift
+	while read -r line; do
+		((ix=ix+1))
+		if [ "$ix" == "$target_ix" ]; then
+			echo "$line" | "$cmd" "$@"
+		else
+			echo "$line"
+		fi
+	done
+}
+
+# file
+check_info() {
+	if sed "5q" "$1" | grep -qv "//"; then
+		false
+	else
+		true
+	fi
+}
+
+# file
+get_usage() {
+	local cfile="$(echo "$1" | sed 's|.c$|.h|g; s|^src/|include/|g')"
+
+	if echo "$1" | grep -Eq ".h$" && [ -f "$cfile" ]; then
+		usage="Header für $cfile"
+	else
+		read -r -p "Zweck von $1: " usage
+	fi
+}
+
+# file
+new_info() {
+	get_usage "$1"
+	echo "// Datei:    $i"
+	echo "// Erstellt: $(date +%F)"
+	echo "// Autor:    $author"
+	echo "// Zweck:    $usage"
+	echo "// Version:  1"
+	echo
+	cat "$1"
+}
+
+update_version() {
+	local line prefix version
+	read -r line
+	prefix="${line%[0-9]*}"
+	version="$(echo "${line##// Version:}" | xargs)"
+	echo "$prefix$((version + 1))"
+}
+
+# file
+update_info() {
+	sed "5q" "$1" | on_line 5 update_version
+}
+
+process_files_with_ext() {
+	for i in $(git status --porcelain | grep -E "^.*\.${1}$" | grep -v "\->" | awk '{print $2}'); do
+		tmp="$(mktemp)"
+		if check_info "$i"; then
+			update_info "$i"
+			tail -n+6 "$i"
+		else
+			new_info "$i"
+		fi > "$tmp"
+		mv "$tmp" "$i"
+		git add "$i"
+	done
+}
+
+process_files_with_ext "c"
+process_files_with_ext "h"
+
+git commit

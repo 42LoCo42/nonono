@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+export LC_ALL=C
+for i in "$@"; do
+	pacman -Qlq "$i" \
+	| while read -r line; do
+		if grep -q '/$' <<< "$line"; then
+			mkdir -pv "root/$line"
+		else
+			ln -sf "$line" "root/$line"
+		fi
+	done
+	version="$(pacman -Qi "$i" | awk '/Version/ {print $3}')"
+	name="$i-$version"
+	ln -sf "/var/lib/pacman/local/$name" "root/.pacman/local/$name"
+done

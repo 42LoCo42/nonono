@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+(($# == 0)) && exec circular "$0" a ::: zeolite client localhost 37812
+
+send() {
+	echo "send" "$@" >&2
+	echo "$@"
+}
+
+while read -r line; do
+	echo "recv $line" >&2
+	send "ok"
+done

@@ -1,0 +1,6 @@
+/.cache
+/.direnv
+/arena
+/compile_commands.json
+/out
+/result

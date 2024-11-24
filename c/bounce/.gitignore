@@ -1,0 +1,6 @@
+/.cache
+/.direnv
+/bounce
+/build
+/compile_commands.json
+/result

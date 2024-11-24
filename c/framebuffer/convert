@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+convert "$1" -resize '640x480!' - \
+| png2ff \
+| ./main \
+> image

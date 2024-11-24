@@ -1,0 +1,7 @@
+/.cache
+/.direnv
+/build
+/compile_commands.json
+/log
+/nst
+/result

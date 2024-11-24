@@ -1,0 +1,4 @@
+space
+	echo foo
+shift + space
+	echo FOO

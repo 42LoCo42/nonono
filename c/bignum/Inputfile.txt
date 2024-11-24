@@ -1,0 +1,46 @@
+Systeminfos:
+	OS:     Arch Linux x86_64
+	Kernel: 5.16.5-zen1-1-zen
+	CPU:    Intel i3-6100 mit 3.7 GHz
+	RAM:    16 GB
+	GCC:    Version 11.1.0, keine Optimierungen aktiv (-O0)
+
+Benchmark-Command:
+(printf 'mean ['; ./main <args> | awk '/<kategorie>/ {print $2}' | paste -sd, | tr -d 's\n'; echo ']') | qalc
+
+Tnew (-V0)
+10    0.00048
+100   0.037
+1000  2.83
+10000 200
+
+Told (-V0)
+10    0.00087
+100   0.16
+1000  65.47
+
+Qnew (-V1)
+10    0.00024
+100   0.02
+1000  0.89
+10000 57.56
+
+Qold (-V1)
+10    0.00055
+100   0.3
+1000  229.59
+
+Naive (-V0)
+10    0.00023
+100   0.0019
+1000  0.036
+
+Newton5 (-V2 -n5)
+10    0.044
+100   4.0816029
+1000  293.77
+
+Newton7 (-V2 -n7)
+10    0.41
+100   34.21
+1000  2773

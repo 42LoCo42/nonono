@@ -1,0 +1,13 @@
+rückgabe in rax
+128 bit: rax & rdx
+
+rdi
+rsi
+rdx
+rcx
+r8
+r9
+stack
+
+https://cdrdv2.intel.com/v1/dl/getContent/671110
+https://cdn.discordapp.com/attachments/935510929049800704/939298842145325166/slides.pdf

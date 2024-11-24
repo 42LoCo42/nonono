@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+echo "$@"
+read -r other
+echo "other: $other" >&2

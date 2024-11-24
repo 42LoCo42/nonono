@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+LD_PRELOAD=./pwdhack.so \
+PWDHACK_PORT=12345 \
+PWDHACK_ROOT="" \
+	exec nc -lvnp 37812

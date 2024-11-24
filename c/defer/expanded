@@ -1,0 +1,63 @@
+int main(int argc, char** argv) {
+	int retval = 0;
+	{
+		void* _defer_locations[32] = {};
+		unsigned char _defer_count = 0;
+		do {
+			{
+				if(argc < 2) return 1;
+				int input = atol(argv[1]);
+
+				_defer_locations[_defer_count++] = && _defer_label_9;
+
+				if(0) {
+					_defer_label_9:
+					printf("exit\n");
+					if(_defer_count > 0) {
+						goto *_defer_locations[--_defer_count];
+					} else {
+						break;
+					}
+				};
+
+				if(input > 51) {
+					_defer_locations[_defer_count++] = && _defer_label_12;
+
+					if(0) {
+						_defer_label_12:
+						printf("input ist zu groß baka\n");
+						if(_defer_count > 0) {
+							goto *_defer_locations[--_defer_count];
+						} else {
+							break;
+						}
+					};
+
+					retval = 255;
+					break;;
+				}
+
+				retval = input * 5;
+
+				_defer_locations[_defer_count++] = && _defer_label_16;
+
+				if(0) {
+					_defer_label_16:
+					printf("kalkulation erfolgreich!\n");
+					if(_defer_count > 0) {
+						goto *_defer_locations[--_defer_count];
+					} else {
+						break;
+					}
+				};
+
+				retval = retval;
+				break;;
+			}
+		} while(0);
+
+		if(_defer_count > 0) goto *_defer_locations[--_defer_count];
+	};
+
+	return retval;
+};
