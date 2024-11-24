@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+coproc lsp (clangd >&2)
+send() {
+	msg="$(jq -nc "$1"'* {jsonrpc: "2.0"}')"
+	{
+		echo "Content-Length: ${#msg}"
+		echo
+		echo -n "$msg"
+	} >&"${lsp[1]}"
+}
+
+send '{id: 1, method: "initialize", params: {workspaceFolders: [{uri: "file://'"$PWD"'", name: "root"}]}}'
+
+sleep 0.5
+while read -p $'\n> ' msg; do
+	send "$msg"
+	sleep 0.5
+done
