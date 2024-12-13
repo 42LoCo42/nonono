@@ -15,6 +15,7 @@
           ];
 
           buildInputs = with pkgs; [
+            fmt
             glfw
             glm
             vulkan-loader

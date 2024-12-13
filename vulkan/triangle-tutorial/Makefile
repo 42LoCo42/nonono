@@ -1,6 +1,6 @@
 NAME    := triangle
-DEPS    := glfw3 glm vulkan
-CFLAGS  := $(CFLAGS)  -Wall -Wextra -std=c++17
+DEPS    := fmt glfw3 glm vulkan
+CFLAGS  := $(CFLAGS)  -Wall -Wextra -std=c++20
 LDFLAGS := $(LDFLAGS) -ldl -lpthread
 
 ################################################################################
