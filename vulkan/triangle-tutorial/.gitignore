@@ -1,0 +1,5 @@
+/.direnv
+/build
+/compile_commands.json
+/result
+/triangle
