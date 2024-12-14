@@ -154,7 +154,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	(void) type;
 	(void) userData;
 
-	fmt::println(stderr, "validation layer: {}", callbackData->pMessage);
+	if(severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+		fmt::println(stderr, "validation layer: {}", callbackData->pMessage);
+	}
 
 	return VK_FALSE;
 }
@@ -225,6 +227,14 @@ class HelloTriangleApplication {
 	VkDevice                 device;
 	VkQueue                  graphicsQueue;
 	VkQueue                  presentQueue;
+	VkSwapchainKHR           swapChain;
+	std::vector<VkImage>     swapChainImages;
+	VkFormat                 swapChainImageFormat;
+	VkExtent2D               swapChainExtent;
+
+	const std::vector<const char*> deviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	};
 
 	struct QueueFamilyIndices {
 		std::optional<uint32_t> graphicsFamily;
@@ -235,6 +245,12 @@ class HelloTriangleApplication {
 				graphicsFamily.has_value() && //
 				presentFamily.has_value();
 		}
+	};
+
+	struct SwapChainSupportDetails {
+		VkSurfaceCapabilitiesKHR        capabilities;
+		std::vector<VkSurfaceFormatKHR> formats;
+		std::vector<VkPresentModeKHR>   presentModes;
 	};
 
 	void initWindow() {
@@ -254,6 +270,7 @@ class HelloTriangleApplication {
 		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
+		createSwapChain();
 	}
 
 	void createInstance() {
@@ -348,7 +365,74 @@ class HelloTriangleApplication {
 
 	bool isDeviceSuitable(VkPhysicalDevice device) {
 		QueueFamilyIndices indices = findQueueFamilies(device);
-		return indices.isComplete();
+
+		bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+		bool swapChainAdequate = false;
+		if(extensionsSupported) {
+			SwapChainSupportDetails details = querySwapChainSupport(device);
+			swapChainAdequate               = //
+				!details.formats.empty() &&   //
+
+				!details.presentModes.empty();
+		}
+
+		return indices.isComplete() && extensionsSupported && swapChainAdequate;
+	}
+
+	bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+		uint32_t extensionCount = 0;
+		vkEnumerateDeviceExtensionProperties(
+			device, nullptr, &extensionCount, nullptr
+		);
+
+		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(
+			device, nullptr, &extensionCount, availableExtensions.data()
+		);
+
+		std::set<std::string> requiredExtensions(
+			deviceExtensions.begin(), deviceExtensions.end()
+		);
+		for(const VkExtensionProperties& extension : availableExtensions) {
+			requiredExtensions.erase(extension.extensionName);
+		}
+
+		return requiredExtensions.empty();
+	}
+
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+		SwapChainSupportDetails details;
+
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+			device, surface, &details.capabilities
+		);
+
+		uint32_t formatCount = 0;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(
+			device, surface, &formatCount, nullptr
+		);
+
+		if(formatCount != 0) {
+			details.formats.resize(formatCount);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(
+				device, surface, &formatCount, details.formats.data()
+			);
+		}
+
+		uint32_t presentModeCount = 0;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(
+			device, surface, &presentModeCount, nullptr
+		);
+
+		if(presentModeCount != 0) {
+			details.presentModes.resize(presentModeCount);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(
+				device, surface, &presentModeCount, details.presentModes.data()
+			);
+		}
+
+		return details;
 	}
 
 	void pickPhysicalDevice() {
@@ -406,7 +490,8 @@ class HelloTriangleApplication {
 		createInfo.pEnabledFeatures      = &deviceFeatures;
 		createInfo.enabledLayerCount     = validationLayers.size();
 		createInfo.ppEnabledLayerNames   = validationLayers.data();
-		createInfo.enabledExtensionCount = 0;
+		createInfo.enabledExtensionCount = deviceExtensions.size();
+		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 		if(vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) !=
 		   VK_SUCCESS) {
@@ -422,6 +507,116 @@ class HelloTriangleApplication {
 		);
 	}
 
+	VkSurfaceFormatKHR chooseSwapSurfaceFormat(
+		const std::vector<VkSurfaceFormatKHR>& availableFormats
+	) {
+		for(const VkSurfaceFormatKHR& availableFormat : availableFormats) {
+			if(availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+			   availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+				return availableFormat;
+		}
+
+		return availableFormats[0];
+	}
+
+	VkPresentModeKHR chooseSwapPresentMode(
+		const std::vector<VkPresentModeKHR>& availablePresentModes
+	) {
+		for(const auto& availablePresentMode : availablePresentModes) {
+			if(availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+				return availablePresentMode;
+			}
+		}
+
+		return VK_PRESENT_MODE_FIFO_KHR;
+	}
+
+	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabalities) {
+		if(capabalities.currentExtent.width !=
+		   std::numeric_limits<uint32_t>::max())
+			return capabalities.currentExtent;
+
+		int width, height;
+		glfwGetFramebufferSize(window, &width, &height);
+
+		VkExtent2D actualExtent = {
+			static_cast<uint32_t>(width),
+			static_cast<uint32_t>(height),
+		};
+
+		actualExtent.width = std::clamp(
+			actualExtent.width, capabalities.minImageExtent.width,
+			capabalities.maxImageExtent.width
+		);
+		actualExtent.height = std::clamp(
+			actualExtent.height, capabalities.minImageExtent.height,
+			capabalities.maxImageExtent.height
+		);
+
+		return actualExtent;
+	}
+
+	void createSwapChain() {
+		SwapChainSupportDetails details = querySwapChainSupport(physicalDevice);
+
+		VkSurfaceFormatKHR surfaceFormat =
+			chooseSwapSurfaceFormat(details.formats);
+		VkPresentModeKHR presentMode =
+			chooseSwapPresentMode(details.presentModes);
+		VkExtent2D extent = chooseSwapExtent(details.capabilities);
+
+		uint32_t imageCount = details.capabilities.minImageCount + 1;
+
+		if(details.capabilities.maxImageCount > 0 &&
+		   imageCount > details.capabilities.maxImageCount) {
+			imageCount = details.capabilities.maxImageCount;
+		}
+
+		VkSwapchainCreateInfoKHR createInfo = {};
+		createInfo.sType         = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		createInfo.surface       = surface;
+		createInfo.minImageCount = imageCount;
+		createInfo.imageFormat   = surfaceFormat.format;
+		createInfo.imageColorSpace  = surfaceFormat.colorSpace;
+		createInfo.imageExtent      = extent;
+		createInfo.imageArrayLayers = 1;
+		createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+		uint32_t           queueFamilyIndices[] = {
+            indices.graphicsFamily.value(),
+            indices.presentFamily.value(),
+        };
+
+		if(indices.graphicsFamily != indices.presentFamily) {
+			createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+			createInfo.queueFamilyIndexCount = 2;
+			createInfo.pQueueFamilyIndices   = queueFamilyIndices;
+		} else {
+			createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		}
+
+		createInfo.preTransform   = details.capabilities.currentTransform;
+		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		createInfo.presentMode    = presentMode;
+		createInfo.clipped        = VK_TRUE;
+		createInfo.oldSwapchain   = VK_NULL_HANDLE;
+
+		if(vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) !=
+		   VK_SUCCESS) {
+			throw std::runtime_error("failed to create swap chain!");
+		}
+
+		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+		swapChainImages.resize(imageCount);
+		vkGetSwapchainImagesKHR(
+			device, swapChain, &imageCount, swapChainImages.data()
+		);
+
+		swapChainImageFormat = surfaceFormat.format;
+		swapChainExtent      = extent;
+	}
+
 	void mainLoop() {
 		// while(!glfwWindowShouldClose(window)) {
 		// 	glfwPollEvents();
@@ -433,6 +628,7 @@ class HelloTriangleApplication {
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		}
 
+		vkDestroySwapchainKHR(device, swapChain, nullptr);
 		vkDestroyDevice(device, nullptr);
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
