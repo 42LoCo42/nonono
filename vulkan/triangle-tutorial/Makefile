@@ -10,6 +10,10 @@ CFLAGS  += $(shell pkg-config --cflags $(DEPS))
 LDFLAGS += $(shell pkg-config --libs   $(DEPS))
 endif
 
+ifdef DEBUG
+CFLAGS  += -DDEBUG
+endif
+
 SRCD := src
 BLDD := build
 

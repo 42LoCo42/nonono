@@ -1,8 +1,15 @@
 {
   outputs = { flake-utils, nixpkgs, ... }:
     flake-utils.lib.eachDefaultSystem (system:
-      let pkgs = import nixpkgs { inherit system; }; in rec {
-        packages.default = pkgs.stdenv.mkDerivation rec {
+      let
+        pkgs = import nixpkgs { inherit system; };
+
+        dbg = {
+          DEBUG = true;
+          VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
+        };
+
+        pkg = pkgs.stdenv.mkDerivation rec {
           pname = "triangle";
           version = "0";
           src = ./.;
@@ -19,17 +26,23 @@
             glfw
             glm
             vulkan-loader
-            vulkan-validation-layers
           ];
 
           meta.mainProgram = pname;
         };
-
-        devShells.default = pkgs.mkShell {
-          inputsFrom = [ packages.default ];
-          packages = with pkgs; [
-            bear
-          ];
+      in
+      rec {
+        packages = rec {
+          default = release;
+          release = pkg;
+          debug = pkg.overrideAttrs (old: dbg // {
+            pname = "${old.pname}-debug";
+          });
         };
+
+        devShells.default = pkgs.mkShell (dbg // {
+          inputsFrom = [ packages.debug ];
+          packages = with pkgs; [ bear ];
+        });
       });
 }
