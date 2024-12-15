@@ -12,6 +12,8 @@
 
 #include "shaders.h"
 
+#define ARRSIZE(x) (sizeof(x) / sizeof(x[0]))
+
 const uint32_t WIDTH  = 800;
 const uint32_t HEIGHT = 600;
 
@@ -236,6 +238,7 @@ class HelloTriangleApplication {
 	std::vector<VkImageView> swapChainImageViews;
 	VkRenderPass             renderPass;
 	VkPipelineLayout         pipelineLayout;
+	VkPipeline               graphicsPipeline;
 
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -742,17 +745,6 @@ class HelloTriangleApplication {
 		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-		std::vector<VkDynamicState> dynamicStates = {
-			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR,
-		};
-
-		VkPipelineDynamicStateCreateInfo dynamicState{};
-		dynamicState.sType =
-			VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		dynamicState.dynamicStateCount = dynamicStates.size();
-		dynamicState.pDynamicStates    = dynamicStates.data();
-
 		VkPipelineViewportStateCreateInfo viewportState{};
 		viewportState.sType =
 			VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -791,6 +783,17 @@ class HelloTriangleApplication {
 		colorBlending.attachmentCount = 1;
 		colorBlending.pAttachments    = &colorBlendAttachment;
 
+		std::vector<VkDynamicState> dynamicStates = {
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR,
+		};
+
+		VkPipelineDynamicStateCreateInfo dynamicState{};
+		dynamicState.sType =
+			VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamicState.dynamicStateCount = dynamicStates.size();
+		dynamicState.pDynamicStates    = dynamicStates.data();
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType =
 			VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -799,6 +802,28 @@ class HelloTriangleApplication {
 			   device, &pipelineLayoutInfo, nullptr, &pipelineLayout
 		   ) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
+		}
+
+		VkGraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineInfo.stageCount          = ARRSIZE(shaderStages);
+		pipelineInfo.pStages             = shaderStages;
+		pipelineInfo.pVertexInputState   = &vertexInputInfo;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pViewportState      = &viewportState;
+		pipelineInfo.pRasterizationState = &rasterizer;
+		pipelineInfo.pMultisampleState   = &multisampling;
+		pipelineInfo.pColorBlendState    = &colorBlending;
+		pipelineInfo.pDynamicState       = &dynamicState;
+		pipelineInfo.layout              = pipelineLayout;
+		pipelineInfo.renderPass          = renderPass;
+		pipelineInfo.subpass             = 0;
+
+		if(vkCreateGraphicsPipelines(
+			   device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+			   &graphicsPipeline
+		   ) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create graphics pipeline!");
 		}
 
 		vkDestroyShaderModule(device, fragShaderModule, nullptr);
@@ -812,6 +837,7 @@ class HelloTriangleApplication {
 	}
 
 	void cleanup() {
+		vkDestroyPipeline(device, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
 
