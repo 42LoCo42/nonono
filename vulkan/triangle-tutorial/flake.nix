@@ -18,6 +18,7 @@
             pkg-config
             shaderc
             spirv-tools
+            tinyxxd
             vulkan-headers
           ];
 

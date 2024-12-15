@@ -3,6 +3,8 @@ DEPS    := fmt glfw3 glm vulkan
 CFLAGS  := $(CFLAGS)  -Wall -Wextra -std=c++20
 LDFLAGS := $(LDFLAGS) -ldl -lpthread
 
+SHADERS := triangle.frag triangle.vert
+
 ################################################################################
 
 ifdef DEPS
@@ -22,16 +24,24 @@ INCS := $(patsubst %.cpp,$(BLDD)/%.d,$(SRCS))
 OBJS := $(patsubst %.cpp,$(BLDD)/%.o,$(SRCS))
 DIRS := $(sort $(shell dirname $(OBJS)))
 
+SHADER-OBJS := $(patsubst %,$(BLDD)/%.spv.o,$(SHADERS))
+
 $(shell mkdir -p $(DIRS))
 
 all: $(NAME)
 
 -include $(INCS)
 
+$(BLDD)/%.spv: $(SRCD)/%
+	glslc $< -o $@
+
+$(BLDD)/%.spv.cpp: $(BLDD)/%.spv
+	xxd -i $< > $@
+
 $(BLDD)/%.o: $(SRCD)/%.cpp
 	$(CXX) $(CFLAGS) -c $< -MMD -o $@
 
-$(NAME): $(OBJS)
+$(NAME): $(OBJS) $(SHADER-OBJS)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 run: $(NAME)

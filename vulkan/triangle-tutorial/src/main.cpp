@@ -10,6 +10,8 @@
 
 #include <err.h>
 
+#include "shaders.h"
+
 const uint32_t WIDTH  = 800;
 const uint32_t HEIGHT = 600;
 
@@ -273,6 +275,7 @@ class HelloTriangleApplication {
 		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
+		createGraphicsPipeline();
 	}
 
 	void createInstance() {
@@ -542,8 +545,8 @@ class HelloTriangleApplication {
 		glfwGetFramebufferSize(window, &width, &height);
 
 		VkExtent2D actualExtent = {
-			static_cast<uint32_t>(width),
-			static_cast<uint32_t>(height),
+			(uint32_t) width,
+			(uint32_t) height,
 		};
 
 		actualExtent.width = std::clamp(
@@ -646,6 +649,53 @@ class HelloTriangleApplication {
 				throw std::runtime_error("failed to create image views!");
 			}
 		}
+	}
+
+	VkShaderModule createShaderModule(const char* code, size_t size) {
+		VkShaderModuleCreateInfo createInfo = {};
+		createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createInfo.codeSize = size;
+		createInfo.pCode    = (uint32_t*) code;
+
+		VkShaderModule shaderModule;
+		if(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) !=
+		   VK_SUCCESS) {
+			throw std::runtime_error("failed to create shader module!");
+		}
+
+		return shaderModule;
+	}
+
+	void createGraphicsPipeline() {
+		VkShaderModule fragShaderModule = createShaderModule(
+			build_triangle_frag_spv, build_triangle_frag_spv_len
+		);
+
+		VkShaderModule vertShaderModule = createShaderModule(
+			build_triangle_vert_spv, build_triangle_vert_spv_len
+		);
+
+		VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+		fragShaderStageInfo.sType =
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+		fragShaderStageInfo.module = fragShaderModule;
+		fragShaderStageInfo.pName  = "main";
+
+		VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+		vertShaderStageInfo.sType =
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+		vertShaderStageInfo.module = vertShaderModule;
+		vertShaderStageInfo.pName  = "main";
+
+		VkPipelineShaderStageCreateInfo shaderStages[] = {
+			vertShaderStageInfo,
+			fragShaderStageInfo,
+		};
+
+		vkDestroyShaderModule(device, fragShaderModule, nullptr);
+		vkDestroyShaderModule(device, vertShaderModule, nullptr);
 	}
 
 	void mainLoop() {
