@@ -5,13 +5,14 @@
         pkgs = import nixpkgs { inherit system; };
 
         dbg = {
+          CFLAGS = "-ggdb";
           DEBUG = true;
           VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
         };
 
         pkg = pkgs.stdenv.mkDerivation rec {
           pname = "triangle";
-          version = "0";
+          version = "1";
           src = ./.;
 
           nativeBuildInputs = with pkgs; [
@@ -35,7 +36,9 @@
       rec {
         packages = rec {
           default = release;
-          release = pkg;
+
+          release = pkg.overrideAttrs { CFLAGS = "-O3"; };
+
           debug = pkg.overrideAttrs (old: dbg // {
             pname = "${old.pname}-debug";
           });
