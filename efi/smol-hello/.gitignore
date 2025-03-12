@@ -1,0 +1,10 @@
+*.efi
+*.fd
+*.o
+*.plist
+*.so
+/.cache
+/.direnv
+/result
+/root
+compile_commands.json
