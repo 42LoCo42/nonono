@@ -1,14 +1,9 @@
 {
-  inputs.nixGL.url = "github:nix-community/nixGL";
-  inputs.nixGL.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.nixGL.inputs.flake-utils.follows = "flake-utils";
-
-  outputs = { nixpkgs, flake-utils, nixGL, ... }:
+  outputs = { nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ nixGL.overlay ];
         };
       in
       rec {
@@ -31,7 +26,6 @@
           packages = with pkgs; [
             bear
             clang-tools
-            nixgl.auto.nixGLDefault
           ];
         };
       });
