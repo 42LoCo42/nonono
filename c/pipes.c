@@ -138,12 +138,6 @@ int main() {
 			extendPipe(&pipes[i]);
 		}
 
-		// clear screen after a number of cycles
-		if(i >= 500) {
-			i = 0;
-			printf("[2J");
-		}
-
 		fflush(stdout);
 		usleep(25000);
 	}
