@@ -29,7 +29,7 @@
 					const reader = new FileReader();
 					reader.onload = async (e) => {
 						const path = file.webkitRelativePath || file.name;
-						const url = `http://localhost:8080/upload/${path}`;
+						const url = `/upload/${path}`;
 						const res = await fetch(url, {
 							method: "POST",
 							body: e.target.result,
