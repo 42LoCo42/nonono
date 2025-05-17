@@ -30,7 +30,11 @@ OCFLAGS :=                  \
 	--target efi-app-x86_64 \
 	--subsystem=10          \
 
-all: main.efi
+TARGETS := main.efi main.img main.iso
+
+all: $(TARGETS)
+
+##### main.efi #################################################################
 
 %.efi: %.so
 	$(OBJCOPY) $(OCFLAGS) $< $@
@@ -41,22 +45,42 @@ all: main.efi
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-install: main.efi
-	install -Dm644 $< $(out)/$<
+##### main.img #################################################################
+
+main.img: main.efi
+	truncate -s 48M $@
+	mformat -i $@ -F
+	mmd     -i $@ ::/EFI
+	mmd     -i $@ ::/EFI/BOOT
+	mcopy   -i $@ $< ::/EFI/BOOT/BOOTX64.EFI
+
+##### main.iso #################################################################
+
+main.iso: main.img
+	rm -rfv  iso
+	mkdir -p iso
+	cp $<    iso
+	xorriso -as mkisofs -R -f -e $< -no-emul-boot -o $@ iso
+
+################################################################################
+
+install: $(TARGETS)
+	install $(TARGETS) $(out)
 .PHONY: install
 
 clean:
 	rm -fv *.efi *.so *.o
+.PHONY: clean
 
 run: main.efi
 	# create root directory
+	rm -rfv     root
 	mkdir -p    root/EFI/BOOT
 	cp main.efi root/EFI/BOOT/BOOTX64.EFI
 	echo abc | iconv -t utf16le > root/data
 
 	# create local OVMF image
-	cp $(OVMF) OVMF.fd
-	chmod +w OVMF.fd
+	install -m644 $(OVMF) OVMF.fd
 
 	# start QEMU
 	qemu-system-x86_64                           \

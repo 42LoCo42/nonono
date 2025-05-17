@@ -17,10 +17,7 @@
 		ST->ConOut->EnableCursor(ST->ConOut, FALSE);                           \
 	}
 
-EFI_STATUS
-EFIAPI
-efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
-	InitializeLib(ImageHandle, SystemTable);
+EFI_STATUS run(EFI_HANDLE ImageHandle) {
 	Print(L"Hello, world!\n");
 
 	// get the currently loaded image
@@ -67,5 +64,17 @@ efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 		Print(L"\n< %s\n", buf);
 	}
 
+	Pause();
+	return EFI_SUCCESS;
+}
+
+EFI_STATUS
+EFIAPI
+efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
+	InitializeLib(ImageHandle, SystemTable);
+	Print(L"ImageHandle = %p, SystemTable = %p\n", ImageHandle, SystemTable);
+	run(ImageHandle);
+	Print(L"End of run()\n");
+	Pause();
 	return EFI_SUCCESS;
 }

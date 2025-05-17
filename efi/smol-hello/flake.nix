@@ -15,8 +15,10 @@
           name = "smol-hello";
           src = ./.;
 
-          buildInputs = with pkgs; [
+          nativeBuildInputs = with pkgs; [
             gnu-efi
+            libisoburn
+            mtools
           ];
         });
 
@@ -24,7 +26,6 @@
           inputsFrom = [ packages.default ];
           packages = with pkgs; [
             bear
-            uefi-run
           ];
         });
       });

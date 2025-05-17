@@ -1,5 +1,7 @@
 *.efi
 *.fd
+*.img
+*.iso
 *.o
 *.plist
 *.so
