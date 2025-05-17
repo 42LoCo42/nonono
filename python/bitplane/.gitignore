@@ -1,0 +1,6 @@
+*.egg-info
+*.jpg
+*.png
+.direnv
+__pycache__
+result
